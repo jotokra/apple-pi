@@ -90,7 +90,7 @@ ok "lifecycle + CLI node syntax clean"
 header "landing page + workflow present"
 [[ -f docs/index.html ]] || { fail "docs/index.html"; exit 1; }
 [[ -f .github/workflows/pages.yml ]] || { fail "pages workflow"; exit 1; }
-grep -q 'curl -fsSL https://jotokra.github.io/apple-pi/install.sh' docs/index.html \
+grep -q 'curl -fsSL https://raw.githubusercontent.com/jotokra/apple-pi/main/install.sh' docs/index.html \
 	|| { fail "landing page missing the one-liner"; exit 1; }
 ok "landing page + one-liner"
 
