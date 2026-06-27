@@ -13,7 +13,9 @@
 #                      config + auth.json after onboarding).
 #   --sandbox <dir>    Use <dir> as PI_CODING_AGENT_DIR (for testing; never touches ~/.pi).
 #   --no-handoff       Stop after P1+purge; print the handoff command instead of exec'ing.
-#   --skip-confirm     Skip the live model-confirm call (for air-gapped / OAuth flows).
+#   --skip-confirm     TEST ONLY: bypass the required live connection check.
+#			      (Was the OAuth/blank-key shortcut in v1; that path is gone —
+#			      a working connection is now mandatory in normal runs.)
 #   -h, --help
 #
 # Privacy: the only credential copies are (a) the encrypted ~/.pi/onboarding.vault
@@ -87,6 +89,22 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/_common.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/provider-guide.sh"
+
+# normalize_url <s>  → echo a clean base URL (https scheme, no trailing slash), or empty.
+# Fixes BUG C (D7): users paste "api.minimax.io/anthropic" or with a stray trailing /.
+normalize_url() {
+	local u="${1// /}"
+	[[ -z "$u" ]] && return 0
+	case "$u" in
+		http://*|https://*) ;;
+		*) u="https://$u" ;;
+	esac
+	u="${u%/}"
+	u="${u%%/}"
+	printf '%s\n' "$u"
+}
 
 PURGE_AUTH_TOO=0
 SANDBOX=""
@@ -156,53 +174,104 @@ else
 fi
 ok "openssl present"
 
+phase 1 5 "welcome"
 header "P0 · consent"
 cat <<'EOF'
 apple-pi will, with your permission:
-  1. Ask which model you'll use (ANY input accepted).
-  2. Capture a credential, ENCRYPT it into ~/.pi/onboarding.vault.
+  1. Help you pick a model + provider (with an offline guide if you're unsure).
+  2. Capture an API key and ENCRYPT it into ~/.pi/onboarding.vault.
   3. Write a config with NO personal information from you.
-  4. Make ONE model call to confirm it works.
-  5. On confirm, DELETE the encrypted vault + all onboarding scratch.
+  4. Make ONE live model call to PROVE the connection works.
+  5. Only on success: DELETE the encrypted vault + all onboarding scratch.
   6. Hand control to the agent, which asks permission to look around,
      then tunes the config to your model and offers a workflow.
 
-Your credentials live only in (a) the transient encrypted vault [deleted]
-and (b) ~/.pi/agent/auth.json [Pi's own 0600 auth store]. Nothing is sent
-anywhere except the single confirmation call to your model provider.
+A working connection is REQUIRED — onboarding does not finish until the
+model answers. Your credentials live only in (a) the transient encrypted
+vault [deleted on success] and (b) ~/.pi/agent/auth.json [Pi's own 0600
+auth store]. Nothing is sent anywhere except the single confirmation call.
 EOF
 [[ "$(yorn 'Proceed?' y)" == "y" ]] || die "aborted by user."
 
 # ── P1 — onboarding ───────────────────────────────────────────────────
-header "P1 · model"
-
+phase 2 5 "choose your model"
 cat <<'EOF'
-Which model will you use? Type anything — a name, a provider/id, even a
-custom endpoint description. apple-pi's agent will recognise and wire it.
-Examples: "gpt-5", "claude-opus-4", "deepseek-chat",
-          "my local ollama llama3", "qwen-max".
+Which model will you use? Type anything — a name, a provider/id, or a
+custom endpoint. apple-pi's agent will recognise and wire it.
+Examples:  gpt-5 · claude-sonnet-4-5 · gemini-2.5-flash · deepseek-chat
+          minimax-m3 · llama-3.3-70b (Groq) · ollama llama3 (local)
+Not sure how to get a key? Pick a provider and the guide will walk you
+through it at the next step.
 EOF
 while true; do
 	MODEL="$(ask 'Model')"
 	[[ -n "$MODEL" ]] && break
 	warn "model can't be empty — any non-empty string is accepted."
 done
-info "recorded model: $MODEL"
+info "recorded model: ${C_BOLD}$MODEL${C_OFF}"
 
-PROVIDER="$(ask 'Provider (optional — e.g. openai, anthropic, ollama, mistral; blank to let the agent resolve)' '')"
+# Provider: resolve from the knowledge base if possible; else ask.
+GUIDE_SLUG="$(provider_match "$MODEL")"
+if [[ -n "$GUIDE_SLUG" ]]; then
+	GUIDE_DISPLAY="$(provider_field "$(provider_file "$GUIDE_SLUG")" display)"
+	info "looks like ${C_BOLD}${GUIDE_DISPLAY}${C_OFF} — I'll wire it."
+	PROVIDER="$(provider_field "$(provider_file "$GUIDE_SLUG")" auth)"
+	[[ -z "$PROVIDER" ]] && PROVIDER="$GUIDE_SLUG"
+	GUIDE_BASE="$(provider_field "$(provider_file "$GUIDE_SLUG")" base)"
+else
+	GUIDE_DISPLAY=""
+	PROVIDER="$(ask 'Provider (optional — e.g. openai, anthropic, ollama, mistral; blank to let the agent resolve)' '')"
+	GUIDE_BASE=""
+fi
+
+# ── credential + guide ────────────────────────────────────────────────
+phase 3 5 "connect your provider"
+echo
+if [[ -n "$GUIDE_SLUG" ]]; then
+	info "Getting a ${GUIDE_DISPLAY} key:"
+else
+	info "Getting a key:"
+fi
+# Offer the guide (it's interactive; harmless if declined).
+if [[ "$(yorn 'Open the key guide? (how/where to get a key, pricing, errors)' y)" == "y" ]]; then
+	provider_guide "$GUIDE_SLUG"
+fi
 
 echo
-info "Now the credential. For API-key providers, paste the key."
-info "For subscription/OAuth providers (ChatGPT Plus, Copilot, Claude Pro),"
-info "leave the key blank — you'll authorise via /login after onboarding."
-API_KEY="$(ask_secret 'API key (leave blank for OAuth)')"
-BASE_URL="$(ask 'Custom base URL (optional — for OpenAI/Anthropic-compatible gateways)' '')"
+info "Paste your API key now. (It's encrypted at rest, never echoed, and"
+info "the encrypted copy is destroyed the moment the connection is confirmed.)"
+if [[ "$GUIDE_SLUG" == "ollama" ]]; then
+	info "Ollama needs no key — just press Enter to leave it blank."
+fi
+API_KEY="$(ask_secret 'API key')"
+
+# Base URL: pre-fill from the guide's known default if non-standard.
+BASE_URL=""
+if [[ -n "$GUIDE_BASE" ]]; then
+	local_default=""
+	case "$GUIDE_SLUG" in
+		minimax) local_default="$GUIDE_BASE" ;;   # non-standard: must be set
+		ollama)  local_default="$GUIDE_BASE" ;;   # local, must be set
+	esac
+	if [[ -n "$local_default" ]]; then
+		info "${GUIDE_DISPLAY} uses a non-standard base URL: ${C_BOLD}${local_default}${C_OFF}"
+		BASE_URL="$local_default"
+		ok "base URL set: $BASE_URL"
+	else
+		raw="$(ask 'Custom base URL (blank = provider default; use a proxy/gateway URL here)' '')"
+		BASE_URL="$(normalize_url "$raw")"
+	fi
+else
+	raw="$(ask 'Custom base URL (optional — for OpenAI/Anthropic-compatible gateways)' '')"
+	BASE_URL="$(normalize_url "$raw")"
+fi
+[[ -n "$BASE_URL" ]] && info "base URL: ${C_BOLD}$BASE_URL${C_OFF}"
 
 # Passphrase for the vault.
-header "P1 · encrypt credentials"
+phase 4 5 "encrypt credentials"
 echo "Set a passphrase for the onboarding vault. It encrypts your credential"
 echo "at rest during bootstrap and is NEVER written to disk. You won't need"
-echo "it again — the vault is destroyed at the end of this phase."
+echo "it again — the vault is destroyed as soon as the connection is confirmed."
 while true; do
 	PASS1="$(ask_secret 'Passphrase')"
 	[[ -n "$PASS1" ]] || { warn "passphrase can't be empty."; continue; }
@@ -283,76 +352,120 @@ fi
 ok "rendered settings.json (model placeholder set; P3 will retune)"
 
 # ── seed auth.json (Pi's own store, 0600) ─────────────────────────────
+# BUG A fix (D7): pi's auth loader (auth-storage.js) requires each entry to be
+#   {provider:{type:"api_key",key}}  — NOT {provider:{apiKey}}. The old shape
+#   silently failed auth for every key onboarding (verified: pi reported the
+#   key MISSING with the old shape, FOUND with the correct one).
 AUTH_OUT="$AGENT_DIR/auth.json"
+AUTH_PROVIDER="$RESOLVED_PROVIDER"
+[[ -n "$AUTH_PROVIDER" ]] || AUTH_PROVIDER="openai"
 if [[ -n "$API_KEY" ]]; then
-	AUTH_PROVIDER="$RESOLVED_PROVIDER"
-	[[ -n "$AUTH_PROVIDER" ]] || AUTH_PROVIDER="openai"
-	printf '{"%s":{"apiKey":%s}}' "$AUTH_PROVIDER" "$(printf '%s' "$API_KEY" | _jq_escape)" > "$AUTH_OUT"
+	printf '{"%s":{"type":"api_key","key":%s}}' "$AUTH_PROVIDER" "$(printf '%s' "$API_KEY" | _jq_escape)" > "$AUTH_OUT"
 	chmod 600 "$AUTH_OUT"
-	ok "seeded $AUTH_OUT (provider=$AUTH_PROVIDER, mode 0600)"
+	ok "seeded $AUTH_OUT (provider=$AUTH_PROVIDER, key $(mask_key "$API_KEY"), mode 0600)"
 else
-	warn "no API key captured — auth.json left for /login (subscription/OAuth provider)."
-	info "after handoff, run:  pi /login"
+	# No key captured (e.g. Ollama, or a user who'll /login later). Seed an empty
+	# store so the confirm step's auth check has something to read; the gate below
+	# will require a real connection before finishing.
+	printf '{}' > "$AUTH_OUT"
+	chmod 600 "$AUTH_OUT"
+	info "no API key captured (provider=$AUTH_PROVIDER). The connection check below"
+	info "will require a working call — run \`pi /login\` now if you use a subscription/OAuth provider."
+fi
+
+# ── models.json: wire a custom base URL (BUG B fix, D7) ────────────────
+# pi reads custom base URLs from ~/.pi/agent/models.json (docs/models.md),
+# NOT from the vault or settings.json. Without this, a gateway/proxy user got
+# a dead config. We write a provider baseUrl override; for a fully custom
+# provider the agent resolves it in P3.
+MODELS_OUT="$AGENT_DIR/models.json"
+if [[ -n "$BASE_URL" ]]; then
+	printf '{"providers":{"%s":{"baseUrl":%s}}}' "$AUTH_PROVIDER" "$(printf '%s' "$BASE_URL" | _jq_escape)" > "$MODELS_OUT"
+	chmod 600 "$MODELS_OUT"
+	ok "wrote $MODELS_OUT (baseUrl override for $AUTH_PROVIDER)"
 fi
 
 # Record the source repo for future updates.
 printf '%s\n' "$REPO_DIR" > "$SOURCE_MARKER"
 
-# ── P1 · confirm the model works ──────────────────────────────────────
+# ── P1 · confirm the connection (REQUIRED gate, D7) ───────────────────
+# Onboarding does NOT finish until a live model call replies OK. The old
+# "blank key = confirmed" path is gone — a working connection is mandatory.
+# --skip-confirm is a test-only escape hatch (it warns loudly when used).
+phase 5 5 "confirm the connection"
 CONFIRMED=0
-if [[ "$SKIP_CONFIRM" == 0 ]]; then
-	header "P1 · confirm model"
-	if [[ -z "$API_KEY" ]]; then
-		warn "no API key → skipping live confirm (OAuth/subscription path)."
-		info "the model is taken as confirmed; run /login after handoff to authorise."
-		CONFIRMED=1
-	elif ! command -v pi >/dev/null 2>&1; then
-		warn "pi not on PATH → skipping live confirm."
+_confirm_call() {
+	# echoes the raw pi output; sets global CONFIRM_OK=1/0. Uses run_with_spinner
+	# for UX. Returns pi's exit code.
+	CONFIRM_OK=0
+	local args=(--no-tools --no-session -p "Reply with exactly: OK")
+	[[ -n "$RESOLVED_PROVIDER" ]] && args=(--provider "$RESOLVED_PROVIDER" "${args[@]}")
+	args=(--model "$MODEL" "${args[@]}")
+	local log; log="$(mktemp)"
+	run_with_spinner "calling $MODEL" "$log" -- pi "${args[@]}"
+	local rc=$?
+	OUT="$(cat "$log" 2>/dev/null)"; rm -f "$log"
+	if (( rc == 0 )) && printf '%s' "$OUT" | grep -qiE '(^|[[:space:]])OK([[:space:]]|$)'; then
+		CONFIRM_OK=1
+	fi
+	return $rc
+}
+
+if [[ "$SKIP_CONFIRM" == 1 ]]; then
+	warn "--skip-confirm: bypassing the REQUIRED connection check (TEST ONLY)."
+	warn "onboarding will finish without proving the model answers."
+	CONFIRMED=1
+elif ! command -v pi >/dev/null 2>&1; then
+	die "pi is not on PATH — cannot run the required connection check. Re-run after installing pi (npm i -g @earendil-works/pi-coding-agent), or use --skip-confirm for tests."
+else
+	# first attempt
+	_confirm_call || true
+	if (( CONFIRM_OK == 1 )); then
+		ok "connection confirmed — $MODEL replied."
 		CONFIRMED=1
 	else
-		info "making one call to: $MODEL"
-		CONFIRM_ARGS=(--no-tools --no-session -p "Reply with exactly the two characters: OK")
-		[[ -n "$RESOLVED_PROVIDER" ]] && CONFIRM_ARGS=(--provider "$RESOLVED_PROVIDER" "${CONFIRM_ARGS[@]}")
-		CONFIRM_ARGS=(--model "$MODEL" "${CONFIRM_ARGS[@]}")
-		if OUT="$(pi "${CONFIRM_ARGS[@]}" 2>&1)"; then
-			if printf '%s' "$OUT" | grep -qiE '(^|[[:space:]])OK([[:space:]]|$)'; then
-				ok "model confirmed — it replied."
-				CONFIRMED=1
-			else
-				warn "model call succeeded but didn't reply 'OK':"
-				printf '%s\n' "$OUT" | head -20 | sed 's/^/    /'
-			fi
-		else
-			warn "model call failed:"
-			printf '%s\n' "$OUT" | head -20 | sed 's/^/    /'
-		fi
-		while [[ "$CONFIRMED" == 0 ]]; do
-			echo
-			case "$(yorn 'Retry the confirm call?' y)" in
-				y)
-					if OUT="$(pi "${CONFIRM_ARGS[@]}" 2>&1)"; then
-						if printf '%s' "$OUT" | grep -qiE '(^|[[:space:]])OK([[:space:]]|$)'; then
-							ok "model confirmed — it replied."
-							CONFIRMED=1
-						else
-							warn "retry: still not 'OK':"
-							printf '%s\n' "$OUT" | head -20 | sed 's/^/    /'
-						fi
-					else
-						warn "retry: call failed:"
-						printf '%s\n' "$OUT" | head -20 | sed 's/^/    /'
-					fi
-					;;
-				n)
-					[[ "$(yorn 'Proceed anyway (model not confirmed)? The agent will retry recognition in P3.' n)" == "y" ]] \
-						&& CONFIRMED=1
-					break ;;
-			esac
-		done
+		warn "the model did not reply OK on the first try. Common causes:"
+		printf '%s\n' "$OUT" | head -12 | sed 's/^/    /'
 	fi
-else
-	warn "confirm skipped (--skip-confirm)."
-	CONFIRMED=1
+	# remediation loop: fix the key/url, peek at the guide, retry — until OK or abort.
+	while [[ "$CONFIRMED" == 0 ]]; do
+		echo
+		info "Pick how to proceed:"
+		local -a fixmenu=( "Re-enter the API key" "Change base URL / provider" "Open the key guide (errors + pricing)" "Retry as-is" "Abort" )
+		case "$(select_option "What next?" "${fixmenu[@]}")" in
+			"Re-enter the API key")
+				API_KEY="$(ask_secret 'New API key')"
+				if [[ -n "$API_KEY" ]]; then
+					printf '{"%s":{"type":"api_key","key":%s}}' "$AUTH_PROVIDER" "$(printf '%s' "$API_KEY" | _jq_escape)" > "$AUTH_OUT"
+					chmod 600 "$AUTH_OUT"
+					ok "auth.json updated ($(mask_key "$API_KEY"))."
+				fi
+				;;
+			"Change base URL / provider")
+				raw="$(ask "Provider [default: ${AUTH_PROVIDER:-openai}]" "")"; [[ -n "$raw" ]] && { RESOLVED_PROVIDER="$raw"; AUTH_PROVIDER="$raw"; }
+			raw="$(ask "Base URL [current: ${BASE_URL:-<provider default>}]" "")"; [[ -n "$raw" ]] && { BASE_URL="$(normalize_url "$raw")"; }
+				if [[ -n "$BASE_URL" ]]; then
+					printf '{"providers":{"%s":{"baseUrl":%s}}}' "$AUTH_PROVIDER" "$(printf '%s' "$BASE_URL" | _jq_escape)" > "$MODELS_OUT"
+					chmod 600 "$MODELS_OUT"
+					ok "models.json updated (baseUrl=$BASE_URL)."
+				fi
+				;;
+			"Open the key guide (errors + pricing)")
+				provider_guide "$GUIDE_SLUG"
+				;;
+			"Retry as-is") : ;;
+			Abort)
+				die "connection not confirmed. Bootstrap secrets RETAINED for retry — re-run when ready." ;;
+		esac
+		_confirm_call || true
+		if (( CONFIRM_OK == 1 )); then
+			ok "connection confirmed — $MODEL replied."
+			CONFIRMED=1
+		else
+			warn "still not OK:"
+			printf '%s\n' "$OUT" | head -8 | sed 's/^/    /'
+		fi
+	done
 fi
 
 # ── P1 · purge bootstrap secrets ──────────────────────────────────────
