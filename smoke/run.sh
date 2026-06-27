@@ -20,7 +20,7 @@ run_one() {
 
 FAILED=0
 if [[ "$target" == "all" ]]; then
-	for s in sanitize structure onboard-sandbox; do run_one "$s"; done
+	for s in sanitize structure onboard-sandbox vault-tracefree; do run_one "$s"; done
 else
 	run_one "$target"
 fi

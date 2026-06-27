@@ -236,12 +236,30 @@ function pruneTransient(passphrase, maxAgeMs = TRANSIENT_MAX_AGE_MS) {
 	return removed;
 }
 
+// ── argument-refusal heuristic (REQ-CV-3; shared with the TUI extension) ──
+// True when a token looks like a pasted credential rather than an id/flag.
+// Used by the /vault add command to REFUSE secrets passed as arguments (the
+// argument is what the session transcript records). Conservative: a 20+ char
+// opaque token or a known key prefix is treated as a secret.
+const SECRET_PREFIXES = ["sk-", "ghp_", "gho_", "github_pat_", "AIza", "xai-", "gsk_", "sk-ant-", "sk-or-"];
+function looksLikeSecret(s) {
+	if (typeof s !== "string") return false;
+	// A known key PREFIX is a strong signal even for a short token (a truncated
+	// sk-ant-… is still obviously a key, not an id). Prefix match bypasses the
+	// length floor; the opaque-token regex still needs 20+ chars to avoid false
+	// positives on short ids.
+	if (SECRET_PREFIXES.some((p) => s.startsWith(p))) return true;
+	if (s.length < 16) return false;
+	return /^[A-Za-z0-9_\-]{20,}$/.test(s);
+}
+
 module.exports = {
 	VAULT_VERSION,
 	TRANSIENT_MAX_AGE_MS,
 	vaultPath, piDir,
 	readVault, writeVault, ensureVault, modifyVault,
 	addEntry, listEntries, getEntry, removeEntry, pruneTransient,
+	looksLikeSecret,
 	// exported for testing only (NOT for echoing secrets):
 	_findEntryForTest: findEntry,
 };

@@ -101,27 +101,21 @@ function parseArgs(args: string): { positional: string[]; flags: Record<string, 
 	return out;
 }
 
-// REQ-CV-3: refuse secrets passed as arguments. Heuristic — an API key is a
-// long-ish opaque string (sk-…, ghp_…, AIza…, xai-…, etc.) with no spaces. If
-// the user typed `/vault add openai sk-abc123`, the second positional looks
-// like a pasted secret, so we refuse and explain why.
-const SECRET_LIKE = /^(sk-|ghp_|gho_|github_pat_|AIza|xai-|gsk_|sk-ant-|sk-or-)/;
-function looksLikeSecret(s: string): boolean {
-	return s.length >= 16 && (SECRET_LIKE.test(s) || /^[A-Za-z0-9_\-]{20,}$/.test(s));
-}
+// REQ-CV-3: refuse secrets passed as arguments. The heuristic lives in the
+// shared core (vault/lib/vault.js looksLikeSecret) so the CLI + extension +
+// tests all agree on what counts as a pasted credential.
+const SECRET_LIKE_REFUSE_MSG =
+	`vault: refusing to accept a secret as a command argument — it would be ` +
+	`recorded in your session transcript. Re-run as "/vault add <id>" and paste ` +
+	`the secret into the prompt that appears.`;
 
 // ── subcommands ───────────────────────────────────────────────────────
 async function cmdAdd(ctx: ExtensionCommandContext, core: any, args: string): Promise<void> {
 	const { positional, flags } = parseArgs(args);
 	// REQ-CV-3: refuse if a secret appears to be passed as an argument.
-	const secretArgs = positional.filter(looksLikeSecret);
+	const secretArgs = positional.filter((p) => core.looksLikeSecret(p));
 	if (secretArgs.length > 0) {
-		ctx.ui.notify(
-			`vault: refusing to accept a secret as a command argument — it would be ` +
-				`recorded in your session transcript. Re-run as "/vault add ${positional[0] || "<id>"}" ` +
-				`and paste the secret into the prompt that appears.`,
-			"warning",
-		);
+		ctx.ui.notify(SECRET_LIKE_REFUSE_MSG, "warning");
 		return;
 	}
 	const id = positional[0] || (await ctx.ui.input("Entry id (e.g. openai, anthropic, gateway)"));
