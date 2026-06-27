@@ -30,10 +30,10 @@ count=$(find config/prompts -type f -name '*.md' | wc -l | tr -d ' ')
 [[ "$count" -eq 4 ]] || { fail "expected 4 prompts, got $count"; exit 1; }
 ok "4 prompts"
 
-header "extensions (7 .ts)"
+header "extensions (8 .ts)"
 count=$(find config/extensions -type f -name '*.ts' | wc -l | tr -d ' ')
-[[ "$count" -eq 7 ]] || { fail "expected 7 extensions, got $count"; exit 1; }
-ok "7 extensions"
+[[ "$count" -eq 8 ]] || { fail "expected 8 extensions, got $count"; exit 1; }
+ok "8 extensions"
 
 header "settings.json.template placeholders"
 for ph in __APPLEPI_PROVIDER__ __APPLEPI_MODEL__ __APPLEPI_EXT_SYSINFO__ \
