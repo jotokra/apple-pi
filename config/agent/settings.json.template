@@ -26,7 +26,8 @@
   },
   "extensions": [
     "__APPLEPI_EXT_SYSINFO__",
-    "__APPLEPI_EXT_WEB__"
+    "__APPLEPI_EXT_WEB__",
+    "__APPLEPI_EXT_VOICE__"
   ],
   "skills": [
     "__APPLEPI_SKILLS_DIR__"
