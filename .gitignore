@@ -17,6 +17,9 @@ settings.json
 # Node / TS
 node_modules/
 *.log
+# VitePress docs build output (built in CI; never committed)
+guide/.vitepress/dist/
+guide/.vitepress/cache/
 
 # OS / editor
 .DS_Store

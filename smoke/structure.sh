@@ -115,6 +115,17 @@ grep -q 'curl -fsSL https://raw.githubusercontent.com/jotokra/apple-pi/main/inst
 	|| { fail "landing page missing the one-liner"; exit 1; }
 ok "landing page + one-liner"
 
+header "docs site (VitePress) source present"
+for f in package.json package-lock.json \
+		guide/index.md guide/why.md guide/install.md guide/usage.md \
+		guide/howto.md guide/commands.md guide/skills.md \
+		guide/.vitepress/config.mts guide/.vitepress/theme/index.ts guide/.vitepress/theme/custom.css; do
+	[[ -f "$f" ]] || { fail "missing $f"; exit 1; }
+done
+node -e "const p=require('./package.json'); if(!(p.scripts&&p.scripts['docs:build']&&p.devDependencies&&p.devDependencies.vitepress)) throw 0" 2>/dev/null \
+	|| { fail "package.json missing docs:build script or vitepress devDep"; exit 1; }
+ok "guide source + docs tooling manifest"
+
 header "extensions type-check (tsc if available)"
 if command -v tsc >/dev/null 2>&1; then
 	# Best-effort; pi-ai types may not resolve without the package installed.
