@@ -374,6 +374,45 @@ async function cmdExport(ctx: ExtensionCommandContext, core: any, args: string):
 	}
 }
 
+// F2: run the user-configured vault.exportCmd with the secret on STDIN.
+// Reads exportCmd from settings.json (same place the CLI reads it). The secret
+// transits only vault → child.stdin; metadata via $VAULT_* env vars.
+async function cmdExportTo(ctx: ExtensionCommandContext, core: any, args: string): Promise<void> {
+	const { positional } = parseArgs(args);
+	const id = positional[0] || (await ctx.ui.input("Entry id to export to your external command"));
+	if (!id) { ctx.ui.notify("vault export-to: no id", "warning"); return; }
+	// read vault.exportCmd from settings.json (the user's config; the CLI reads
+	// the same file).
+	let exportCmd = "";
+	try {
+		const pdir = process.env.PI_CODING_AGENT_DIR || `${process.env.HOME || os.homedir()}/.pi`;
+		const s = JSON.parse(fs.readFileSync(path.join(pdir, "settings.json"), "utf8"));
+		const v = s && s.vault && s.vault.exportCmd;
+		if (typeof v === "string") exportCmd = v;
+	} catch { /* settings unreadable → treat as unset */ }
+	if (!exportCmd.trim()) {
+		ctx.ui.notify(
+			"vault export-to: no vault.exportCmd configured. Set it in settings.json " +
+			"(e.g. { \"vault\": { \"exportCmd\": \"op item create $VAULT_PROVIDER\" } }). " +
+			"The secret is piped to the command's stdin; metadata via $VAULT_ID/PROVIDER/KIND/NOTE.",
+			"warning",
+		);
+		return;
+	}
+	const ok = await ctx.ui.confirm(
+		"Run external export command?",
+		`Run your vault.exportCmd to export "${id}"?\n  command: ${exportCmd}\nThe secret is piped to its stdin (never on the command line).`,
+	);
+	if (!ok) return;
+	try {
+		const r = await core.exportToCommand(cachedPass!, id, { exportCmd });
+		if (!r.ok) { ctx.ui.notify(`vault export-to: ${r.reason}`, "warning"); return; }
+		ctx.ui.notify(`vault: exported "${id}" via vault.exportCmd`, "info");
+	} catch (e: any) {
+		ctx.ui.notify(`vault export-to failed: ${e?.message || String(e)}`, "error");
+	}
+}
+
 function cmdLock(ctx: ExtensionCommandContext): void {
 	cachedPass = null;
 	ctx.ui.notify("vault: passphrase forgotten — re-prompt next /vault use", "info");
@@ -381,7 +420,7 @@ function cmdLock(ctx: ExtensionCommandContext): void {
 
 // ── registration ──────────────────────────────────────────────────────
 export default function credentialVaultExtension(pi: ExtensionAPI): void {
-	const SUBS = ["add", "list", "get", "remove", "rotate", "import", "export", "lock", "prune-transient"];
+	const SUBS = ["add", "list", "get", "remove", "rotate", "import", "export", "export-to", "lock", "prune-transient"];
 	pi.registerCommand("vault", {
 		description: "Encrypted credential vault (add/list/get/remove/rotate/import/export/lock)",
 		getArgumentCompletions: (prefix) => {
@@ -414,6 +453,7 @@ export default function credentialVaultExtension(pi: ExtensionAPI): void {
 				case "rotate":           return cmdRotate(ctx, core, rest);
 				case "import":           return cmdImport(ctx, core, rest);
 				case "export":           return cmdExport(ctx, core, rest);
+				case "export-to":        return cmdExportTo(ctx, core, rest);
 				case "prune-transient":  return cmdPruneTransient(ctx, core);
 				case "lock":             return cmdLock(ctx); return;
 				default:

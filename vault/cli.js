@@ -16,11 +16,24 @@
 "use strict";
 const fs = require("node:fs");
 const path = require("node:path");
+const os = require("node:os");
 const {
 	ensureVault, addEntry, rotateEntry, listEntries, getEntry, removeEntry,
 	pruneTransient, importEntries, parseImportFile, shredFile, exportToAuth,
-	vaultPath,
+	exportToCommand, vaultPath,
 } = require("./lib/vault");
+
+// Read vault.exportCmd from pi's settings.json (the documented home for vault.*
+// settings). Returns "" if unset. (The TUI reads the same key from ctx but the
+// CLI has no ctx; it reads the file the user edited.)
+function readExportCmd() {
+	const piDir = process.env.PI_CODING_AGENT_DIR || `${process.env.HOME || os.homedir()}/.pi`;
+	try {
+		const s = JSON.parse(fs.readFileSync(path.join(piDir, "settings.json"), "utf8"));
+		const v = s && s.vault && s.vault.exportCmd;
+		return typeof v === "string" ? v : "";
+	} catch { return ""; }
+}
 
 function readSecretFromStdin() {
 	// Read one line from stdin with echo OFF when stdin is a tty. For piped
@@ -90,6 +103,7 @@ function usage() {
   vault rotate <id>                replace an existing entry's secret (stdin)
   vault import <file>              bulk-load entries from JSON, then shred source
   vault export <id> [--provider P] write the secret into auth.json (api_key shape)
+  vault export-to <id>      run vault.exportCmd with the secret on STDIN (F2)
 
 Passphrase: set CREDENTIALS_VAULT_PASS for non-interactive use, or it is
 prompted on the tty. Vault: ${vaultPath()}
@@ -211,6 +225,27 @@ function run(argv) {
 			if (!r.wrote) { process.stderr.write(`vault export: ${r.reason}\n`); return 1; }
 			process.stdout.write(`exported '${id}' → auth.json['${r.provider}']\n`);
 			return 0;
+		}
+		case "export-to": {
+			// F2: run the user-configured vault.exportCmd with the secret on STDIN.
+			const { positional } = parseFlags(rest, new Set([]));
+			const id = positional[0];
+			if (!id) { process.stderr.write("vault export-to: id required\n"); return 2; }
+			const exportCmd = readExportCmd();
+			if (!exportCmd) {
+				process.stderr.write("vault export-to: no vault.exportCmd configured.\n");
+				process.stderr.write("  Set it in ~/.pi/settings.json, e.g.\n");
+				process.stderr.write('    { "vault": { "exportCmd": "op item create --category=\'API Key\' $VAULT_PROVIDER" } }\n');
+				process.stderr.write("  The secret is piped to the command's STDIN; metadata via $VAULT_ID/PROVIDER/KIND/NOTE env vars.\n");
+				return 2;
+			}
+			// exportToCommand is async (spawns the child). The CLI is sync elsewhere;
+			// await via .then at the top-level run() boundary.
+			return exportToCommand(pass, id, { exportCmd }).then((r) => {
+				if (!r.ok) { process.stderr.write(`vault export-to: ${r.reason}\n`); return 1; }
+				process.stdout.write(`exported '${id}' via vault.exportCmd\n`);
+				return 0;
+			});
 		}
 		default:
 			process.stderr.write(`vault: unknown subcommand '${sub}'\n`);
