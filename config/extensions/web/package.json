@@ -1,0 +1,13 @@
+{
+  "name": "pi-web-extension",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "dependencies": {
+    "node-html-parser": "^7.0.1",
+    "playwright": "^1.61.0"
+  }
+}
