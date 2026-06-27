@@ -421,6 +421,19 @@
 					<li>kanban · telegram</li>
 				</ul>
 			</div>
+			<div class="item">
+				<h3>The credential vault</h3>
+				<p>Keys don't sit in <code>.zshrc</code> or <code>.env</code> — they sit in one encrypted file, and the
+					safe path is the easy path:</p>
+				<ul>
+					<li><strong>trace-free entry</strong> — paste into a masked prompt; it never reaches your input line, your session log, or your shell history</li>
+					<li><strong>encrypted at rest</strong> — one file, locked with a passphrase you choose (<code>0600</code>)</li>
+					<li><strong>you gate every reveal</strong> — <code>/vault list</code> shows names, not secrets</li>
+					<li><strong>onboarding cleans up</strong> — the install key is marked temporary and pruned the moment the connection is proven; keys you add yourself stay</li>
+				</ul>
+				<p style="margin-top:0.5rem;color:var(--muted);">Defense in depth against accidental leakage — not a sealed vault against a thief
+					with your laptop <em>and</em> passphrase. Turn on FileVault for the outer wall.</p>
+			</div>
 		</div>
 	</div>
 </section>
