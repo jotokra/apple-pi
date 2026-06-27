@@ -80,7 +80,7 @@ on whatever you typed.
 | Persona | 1 | `config/agent/AGENTS.md` — the contract every session loads |
 | Skills | 8 | plan-decompose, read-docs-first, verify-own-work, red-blue, long-horizon-compaction, **self-assess**, session-record, n8n-workflow-author |
 | Prompts | 4 | `/decompose`, `/spec`, `/redteam`, `/design` |
-| Extensions | 7 | sysinfo-guard (always on), n8n/forgejo/netbird/llm/kanban/telegram (on demand, env-configured) |
+| Extensions | 7 + web | sysinfo-guard (always on), **web** (search/fetch/browser, default on), n8n/forgejo/netbird/llm/kanban/telegram (on demand) |
 | Wizard | 1 | `install.sh` + `lib/` (P0–P1 + handoff) |
 | Handoff | 1 | `lib/handoff.md` — drives the agent through P2–P5 |
 | Smoke | 4 | sanitize · structure · onboard-sandbox · run |
@@ -90,6 +90,30 @@ recurring 3-iteration ritual (discovery → red/blue → apply+reevaluate) that
 aligns the config with the model's *real* capabilities, verified from the
 catalog and request-shaping code rather than from prose. Re-run it any time
 your model, tooling, or hardware changes.
+
+## Web & browser control
+
+apple-pi ships a **web extension** (on by default) that gives the agent eyes
+and hands on the live web — so "use the best viable way" reaches beyond your
+filesystem:
+
+- **`web_search`** — ranked results (title / url / snippet). Free default
+  (DuckDuckGo); optional Tavily / Brave via API key.
+- **`web_fetch`** — fetch a URL → cleaned markdown (links preserved); render
+  JavaScript-heavy SPAs through the browser when needed.
+- **`browser_*`** (13 tools) — drive **your own persistent, headed Chrome**:
+  navigate, snapshot, click, type, check boxes, fill forms, take screenshots,
+  switch tabs. Logins and cookies survive between runs.
+
+The browser is **headed by default** — you can watch every click. Element
+references (`[N]` refs from `browser_snapshot`) make interactions deterministic
+without fragile CSS selectors, and the tool guidelines require the agent to
+confirm before any payment, deletion, or other irreversible action.
+
+Configure with env vars (`PI_BROWSER_HEADLESS`, `PI_WEB_SEARCH_PROVIDER`,
+`PI_BROWSER_CDP_URL`, …). No secrets ship in the repo — keys are env-only.
+See [`config/extensions/web/README.md`](config/extensions/web/README.md) and the
+[spec](.docs/web-extension.md).
 
 ## The three workflow offers (P5)
 
