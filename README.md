@@ -15,6 +15,40 @@ clone-and-run repo. **Zero personal information is shipped** — the
 
 ---
 
+## Why apple-pi
+
+Most ways of giving an agent a key leak: `~/.zshrc` sprays it into every
+process's env (`ps e`, crash dumps); `.env` gets `git add`'d by accident;
+pasting it into chat lives forever in the session transcript. And most agent
+configs are written for **one** model — switch models and you hand-tune the
+knobs yourself, or you adopt a cloud agent that's easy to start but comes
+with a vendor account, one model family, and telemetry.
+
+apple-pi is the bet that there's a better middle:
+
+- **The safe path is the easy path for keys.** `/vault` stores a key
+  encrypted, enters it through a masked prompt that never touches your input
+  line, and leaves **no trace** in sessions, telemetry, logs, or shell
+  history. You stop pasting keys anywhere else because you don't need to.
+- **It tunes itself to *your* model.** On install, and any time your stack
+  changes, the `self-assess` ritual reads your model's **real** capabilities
+  from the pi-ai catalog (context window, thinking model, vision, cost) and
+  rewrites `settings.json` for it — from the code path, not from prose. Bring
+  any model; the harness adapts.
+- **Methodology arrives as skills, not opinions baked into the binary.**
+  Spec-first planning, verify-your-own-work, red/blue review, decomposition —
+  eight reusable skills you can read, run, edit, or remove. The agent is
+  opinionated about *how* to work; you keep the right to disagree.
+- **You own it.** Zero telemetry, zero vendor lock-in, MIT. Nothing phones
+  home — `smoke/sanitize.sh` enforces that no personal data ships, on every
+  change. It's a pi config plus a persona, not a service.
+
+If you want raw `pi` with none of the opinions, use `pi` directly. If you
+want a one-vendor cloud agent, use one. apple-pi is for the person who wants
+the opinionated, privacy-first, self-tuning middle — and wants to own it.
+
+---
+
 ## Quick start
 
 **One line:**
@@ -60,6 +94,78 @@ hardcoded model menu would defeat "any input accepted." The wizard stores
 your free-form model string verbatim and the agent (running on that model
 once confirmed) resolves it against ground truth — making a genuine attempt
 on whatever you typed.
+
+---
+
+## Using apple-pi
+
+### Your first session
+
+```bash
+pi
+```
+
+That's it. The persona loads (a senior-engineer / red-blue-teamer contract),
+the skills auto-discover, and you're talking to your model. Try:
+
+- `/decompose build a CLI tool that does X` — breaks the goal into
+  independent tasks with verification hooks (the `plan-decompose` skill).
+- `/spec design an n8n workflow for Y` — drafts a full spec without writing
+  code (`/spec` + `/design` prompts).
+- `/redteam review my last change` — finds every way it can break
+  (the `red-blue` skill).
+
+Re-run any time: `pi -p "…"` for a one-shot, `pi -r` to resume, `pi -c` to
+continue after a voice session. Sessions are tree-structured — branch a
+plan, navigate back.
+
+### Commands
+
+**In the TUI (`pi`):**
+
+| Command | What it does |
+|---|---|
+| `/vault add` · `list` · `get` · `remove` · `rotate` · `lock` | encrypted, trace-free credential store (see [Credential Vault](#credential-vault)) |
+| `/vault export <id>` · `export-to <id>` | bridge a key into `auth.json` or your own `vault.exportCmd` |
+| `/voice` (or **Ctrl+V**) | type ⇄ talk, on-device (see [Voice mode](#voice-mode-type--talk)) |
+| `/decompose` · `/spec` · `/redteam` · `/design` | the four methodology prompts |
+| `/skill:self-assess` | re-tune the config to your current model |
+
+**On the shell (`apple-pi …`):**
+
+| Command | What it does |
+|---|---|
+| `apple-pi vault …` | headless vault access (`add` reads the secret from stdin) |
+| `apple-pi collect` · `aggregate` | the autoresearch daily/weekly jobs (run by the schedule) |
+| `apple-pi review` · `apply --latest --yes` | review then apply a self-improvement proposal |
+| `apple-pi update --check` · `--all --yes` | check for / install apple-pi + pivoice updates |
+| `apple-pi schedule install` | wire the daily+weekly jobs (launchd on macOS, cron elsewhere) |
+
+### Skills at a glance
+
+| Skill | When it runs |
+|---|---|
+| `plan-decompose` | breaking a big goal into independent, verifiable tasks |
+| `read-docs-first` | before touching any repo — the pre-flight reading order |
+| `verify-own-work` | after every concrete change — test, lint, smoke, diff |
+| `red-blue` | security review of anything touching auth/secrets/paths/listeners |
+| `self-assess` | the recurring tune-the-config-to-the-model ritual |
+| `session-record` | save/resume distilled session records across days |
+| `long-horizon-compaction` | tree-structured sessions + deliberate compaction |
+| `n8n-workflow-author` | design an n8n workflow end-to-end |
+
+### How-to guides
+
+Task-oriented step-by-step guides live in [`docs/HOWTO.md`](docs/HOWTO.md):
+
+- [Add, rotate, or export a key](docs/HOWTO.md#add-rotate-or-export-a-key)
+- [Change your model (or re-tune for a new one)](docs/HOWTO.md#change-your-model-or-re-tune)
+- [Wire a workflow (n8n / obsidian / monitoring)](docs/HOWTO.md#wire-a-workflow)
+- [Use voice mode](docs/HOWTO.md#use-voice-mode)
+- [Keep apple-pi current](docs/HOWTO.md#keep-apple-pi-current)
+- [Troubleshoot](docs/HOWTO.md#troubleshoot)
+
+---
 
 ## Privacy posture
 
@@ -180,17 +286,6 @@ back — **same conversation**:
 
 See [`config/voice/README.md`](config/voice/README.md). (First use needs
 `brew install whisper-cpp` + a ggml model; the installer offers the brew step.)
-
-## Using apple-pi after install
-
-```bash
-pi                         # interactive, on your model
-pi -p "decompose 'build X'"   # one-shot
-pi -r                       # resume a session
-```
-
-The skills auto-load. Use `/decompose`, `/spec`, `/redteam`, `/design` for
-the prompts, and `/skill:self-assess` to re-tune when your stack changes.
 
 ## `install.sh` flags
 
