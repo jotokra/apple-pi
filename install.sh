@@ -317,30 +317,29 @@ _install_tree skills
 _install_tree prompts
 _install_tree extensions
 
-# Voice bundle ships as a pi package (pivoice.py + bin + manifest). OS deps
-# (python3, ffmpeg, whisper-cpp) are runtime — offer to brew-install them,
-# best-effort, never fail onboarding. The bridge extension in config/extensions
-# launches the bundled pivoice; /voice works once deps are in place.
+# Voice bundle ships as a pi package (pivoice.py + bin + manifest). The bundle
+# is always copied (cheap; makes /voice + Ctrl+V exist). The heavy deps
+# (brew packages + ~465MB model) are OPT-IN: one yorn prompt calls the
+# reusable lifecycle/voice-enable.sh. Decline -> /voice still exists and
+# prints the enable command when the user tries it.
 VOICE_DIR="$PI_DIR/voice"
 if [[ -d "$REPO_DIR/config/voice" ]]; then
 	rm -rf "$VOICE_DIR"
 	cp -R "$REPO_DIR/config/voice" "$VOICE_DIR" || die "failed to copy config/voice"
-	ok "copied config/voice → $VOICE_DIR"
-	# best-effort OS deps (warn-only)
-	if command -v brew >/dev/null 2>&1; then
-		for pkg in ffmpeg whisper-cpp; do
-			command -v "${pkg%-*}" >/dev/null 2>&1 || command -v "$pkg" >/dev/null 2>&1 || \
-				brew install "$pkg" >/dev/null 2>&1 && ok "brew: $pkg ready" || warn "brew install $pkg failed — install later for voice mode"
-		done
+	ok "copied config/voice → $VOICE_DIR (/voice available; deps optional)"
+fi
+
+# Opt-in voice deps (Path A): ask once, never force, never fail onboarding.
+# In --sandbox/test mode (or non-interactive stdin), skip the prompt and just
+# point the user at the enable script — onboarding must never block on voice.
+if [[ -x "$REPO_DIR/lifecycle/voice-enable.sh" ]]; then
+	if [[ -n "$SANDBOX" ]]; then
+		info "sandbox mode — voice deps not installed. Enable later: bash $REPO_DIR/lifecycle/voice-enable.sh"
+	elif [[ "$(yorn 'Enable voice mode now? (downloads ~465MB + brew packages; optional)' n)" == "y" ]]; then
+		bash "$REPO_DIR/lifecycle/voice-enable.sh" --yes || warn "voice-enable reported issues — /voice will print the command later"
+	else
+		info "voice skipped. Enable any time: bash $REPO_DIR/lifecycle/voice-enable.sh"
 	fi
-	command -v python3 >/dev/null 2>&1 || warn "python3 not found — voice mode needs it"
-	# the ggml model is ~465MB; download lazily (first /voice run can offer it),
-	# but seed the dir so pivoice finds it.
-	mkdir -p "$VOICE_DIR/models"
-	warn "voice mode: download a whisper model before first use:"
-	warn "  curl -L -o $VOICE_DIR/models/ggml-small.en.bin \\\\"
-	warn "    https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin"
-	warn "  add $VOICE_DIR/bin to PATH for standalone 'pivoice' (optional; /voice doesn't need it)"
 fi
 
 # Web bundle ships with its own package.json (playwright + node-html-parser).

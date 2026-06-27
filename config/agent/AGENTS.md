@@ -171,10 +171,28 @@ leaks (`ps e`, core dumps, shell history, session transcripts).
 ## Extensions (loaded from `~/.pi/extensions/`)
 
 apple-pi ships portable + parameterized extensions. The onboarding /
-workflow-offer phases enable the ones the user actually needs:
+workflow-offer phases enable the ones the user actually needs. **Default-on**
+extensions need no credentials; **on-demand** ones need env/config:
+
+**Default-on (no creds):**
 
 - `sysinfo-guard.ts` — always on; refuses destructive bash and writes to
   protected paths.
+- `web/` — **web + browser control.** `web_search` (ranked results),
+  `web_fetch` (URL → markdown), and `browser_*` (13 tools) that drive the
+  user's **persistent, headed Chrome** — navigate, snapshot refs, click,
+  type, check, fill forms, screenshot, tabs. Headed by default = the
+  transparency guardrail; **confirm before any payment / deletion /
+  irreversible action.** No secrets; provider keys optional via env.
+- `voice.ts` — **voice mode bridge.** `/voice` (or Ctrl+V) flips the active
+  session into `pivoice` (on-device whisper.cpp + `say`); voice turns append
+  to the same JSONL, `pi -c` resumes. TUI-only.
+
+**On-demand (need env/config):**
+
+- `credential-vault.ts` — encrypted, trace-free key store. `/vault add|list|
+  get|remove|rotate|import|export|export-to|lock`. Use it for any credential
+  the user hands you (see the Credentials section above).
 - `n8n-bridge.ts` — n8n workflow authoring (enabled in the n8n workflow offer).
 - `forgejo-bridge.ts` — forgejo PR/repo bridge (enabled on demand).
 - `netbird-status.ts` — read-only NetBird overlay status (enabled on demand).

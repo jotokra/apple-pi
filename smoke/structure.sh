@@ -94,6 +94,7 @@ header "install.sh + lib syntax"
 bash -n install.sh || { fail "install.sh syntax"; exit 1; }
 bash -n lib/_common.sh || { fail "_common.sh syntax"; exit 1; }
 bash -n lifecycle/schedule.sh || { fail "schedule.sh syntax"; exit 1; }
+bash -n lifecycle/voice-enable.sh || { fail "voice-enable.sh syntax"; exit 1; }
 for s in smoke/*.sh; do bash -n "$s" || { fail "$s syntax"; exit 1; }
 done
 ok "shell syntax clean"

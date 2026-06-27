@@ -178,8 +178,18 @@ back — **same conversation**:
 - Talk. Press `q` to exit voice mode.
 - Resume the TUI: **`pi -c`** — the voice turns appear in the session tree.
 
-See [`config/voice/README.md`](config/voice/README.md). (First use needs
-`brew install whisper-cpp` + a ggml model; the installer offers the brew step.)
+See [`config/voice/README.md`](config/voice/README.md).
+
+**Setup (opt-in, one command):** onboarding offers to enable voice (downloads
+~465MB model + brew packages). Decline and it's still one command later:
+
+```sh
+bash ~/.apple-pi/lifecycle/voice-enable.sh          # interactive
+bash ~/.apple-pi/lifecycle/voice-enable.sh --check  # status only
+```
+
+If you try `/voice` before enabling, apple-pi prints that command instead of
+launching a dead session.
 
 ## Using apple-pi after install
 
