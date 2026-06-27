@@ -403,13 +403,90 @@ function maskedDotRow(prompt, bufferLen, width) {
 	return "•".repeat(Math.min(Math.max(0, bufferLen | 0), dotBudget));
 }
 
+// ── F2: generic external export (vault.exportCmd) ────────────────────
+// Runs a USER-CONFIGURED command, piping the secret to its STDIN. Mirrors pi's
+// own `apiKey: "!command"` resolution + git's credential.helper: the user owns
+// the command (their secret manager — 1Password CLI, pass, bitwarden, a custom
+// helper); apple-pi is sanitized so NO specific store is hardcoded.
+//
+// LOAD-BEARING SAFETY (red/blue R-F2a/b/c, re-derived after first draft):
+//   - the SECRET is piped to the child's STDIN only — never argv, never env,
+//     never interpolated into the command string (so `ps e` can't see it).
+//   - NON-SECRET metadata ($VAULT_ID/PROVIDER/KIND/NOTE) is passed as ENV
+//     VARS, NOT string-interpolated into the command — so a malicious note
+//     (e.g. "; rm -rf ~") can't break out of the command's argv. The command
+//     string is static user config; only $VAULT_* env vars are read.
+//   - stdin is ended immediately after the write; a 10s timeout kills a hung
+//     child. Non-zero exit is surfaced (exit code), the secret NOT re-exposed.
+function exportToCommand(passphrase, id, opts = {}) {
+	const cmd = opts.exportCmd;
+	if (!cmd || typeof cmd !== "string" || !cmd.trim()) {
+		return Promise.resolve({ ok: false, reason: "no vault.exportCmd configured (set it in settings.json to enable /vault export-to)" });
+	}
+	const entry = getEntry(passphrase, id);
+	if (!entry) return Promise.resolve({ ok: false, reason: `no entry '${id}'` });
+	// metadata-only env (NON-SECRET). The secret is NEVER an env var.
+	const childEnv = {
+		...process.env,
+		VAULT_ID: String(entry.id || ""),
+		VAULT_PROVIDER: String(entry.provider || entry.id || ""),
+		VAULT_KIND: String(entry.kind || "api_key"),
+		VAULT_NOTE: String(entry.note || ""),
+	};
+	return new Promise((resolve) => {
+		let child;
+		try {
+			// shell:true so the user's command can use pipes/quotes as intended.
+			// The command is static user config (no secret interpolation), so shell
+			// metacharacters are the user's explicit intent.
+			child = require("node:child_process").spawn(cmd, [], {
+				shell: true, stdio: ["pipe", "inherit", "inherit"], env: childEnv,
+			});
+		} catch (e) {
+			resolve({ ok: false, reason: `could not spawn export command: ${e && e.message || String(e)}` });
+			return;
+		}
+		let timedOut = false;
+		const timer = setTimeout(() => {
+			timedOut = true;
+			try { child.kill("SIGKILL"); } catch { /* already dead */ }
+		}, 10000);
+		let stderrTail = "";
+		if (child.stderr) {
+			child.stderr.on("data", (d) => {
+				// keep a short tail for diagnostics; the secret is on STDIN, never stderr.
+				stderrTail = (stderrTail + d.toString()).slice(-512);
+			});
+		}
+		child.on("error", (e) => {
+			clearTimeout(timer);
+			resolve({ ok: false, reason: `export command failed to start: ${e.message}` });
+		});
+		child.on("close", (code, signal) => {
+			clearTimeout(timer);
+			if (timedOut) { resolve({ ok: false, reason: "export command timed out (10s) and was killed" }); return; }
+			if (code === 0) resolve({ ok: true });
+			else resolve({ ok: false, reason: `export command exited ${code}${signal ? " (" + signal + ")" : ""}${stderrTail ? ": " + stderrTail.trim() : ""}` });
+		});
+		// THE secret transits ONLY here: vault → child.stdin. Then close stdin.
+		try {
+			child.stdin.write(entry.secret);
+			child.stdin.end();
+		} catch (e) {
+			clearTimeout(timer);
+			try { child.kill("SIGKILL"); } catch { /* */ }
+			resolve({ ok: false, reason: `could not write secret to command stdin: ${e && e.message || String(e)}` });
+		}
+	});
+}
+
 module.exports = {
 	VAULT_VERSION,
 	TRANSIENT_MAX_AGE_MS,
 	vaultPath, piDir, authJsonPath,
 	readVault, writeVault, ensureVault, modifyVault,
 	addEntry, rotateEntry, listEntries, getEntry, removeEntry, pruneTransient,
-	importEntries, parseImportFile, shredFile, exportToAuth,
+	importEntries, parseImportFile, shredFile, exportToAuth, exportToCommand,
 	looksLikeSecret, maskedDotRow,
 	// exported for testing only (NOT for echoing secrets):
 	_findEntryForTest: findEntry,
