@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>apple-pi — a self-tuning, privacy-first coding agent you own</title>
-<meta name="description" content="A refined distribution of the Pi Coding Agent. Bring any model; apple-pi handles onboarding, encrypts and destroys your key, tunes itself to your model, and improves itself — with you in control.">
+<title>apple-pi — the self-improving coding agent</title>
+<meta name="description" content="apple-pi is a coding agent that researches how you work and improves itself — you gate every change. It talks (voice), drives your real browser, holds your keys, and bridges to your whole stack. Bring any model.">
 <style>
 	:root {
 		/* warm "apple" palette: blossom-pink + baked-gold on warm near-black */
@@ -16,9 +16,9 @@
 		--text:      #f7efe4;
 		--muted:     #b09a89;
 		--dim:       #8a7766;
-		--pink:      #ff7a9c;   /* apple-blossom */
+		--pink:      #ff7a9c;
 		--pink-deep: #e85d7e;
-		--gold:      #f0a868;   /* baked-apple gold */
+		--gold:      #f0a868;
 		--gold-soft: #ffc987;
 		--green:     #7fd1a1;
 		--mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -28,7 +28,7 @@
 	html { scroll-behavior: smooth; }
 	body {
 		margin: 0; background: var(--bg); color: var(--text);
-		font-family: var(--sans); line-height: 1.65;
+		font-family: var(--sans); line-height: 1.6;
 		-webkit-font-smoothing: antialiased;
 		overflow-x: hidden;
 	}
@@ -40,33 +40,52 @@
 			radial-gradient(50rem 40rem at 95% 5%,  rgba(240, 168, 104, 0.13), transparent 60%),
 			radial-gradient(40rem 30rem at 50% 110%, rgba(255, 122, 156, 0.08), transparent 60%);
 	}
-	.wrap { max-width: 880px; margin: 0 auto; padding: 0 1.5rem; }
+	.wrap { max-width: 1040px; margin: 0 auto; padding: 0 1.5rem; }
 
-	/* ── hero ──────────────────────────────────────────────────────── */
-	.hero { padding: 5rem 0 3rem; text-align: center; }
+	/* ── sticky nav ─────────────────────────────────────────────────── */
+	.nav {
+		position: sticky; top: 0; z-index: 50;
+		backdrop-filter: blur(14px) saturate(140%);
+		background: rgba(22, 15, 12, 0.72);
+		border-bottom: 1px solid var(--card-brd);
+	}
+	.nav .row {
+		max-width: 1040px; margin: 0 auto; padding: 0.7rem 1.5rem;
+		display: flex; align-items: center; gap: 1rem;
+	}
+	.nav .brand { font-weight: 800; letter-spacing: -0.02em; font-size: 1.05rem; display: flex; align-items: center; gap: 0.4rem; text-decoration: none; color: var(--text); }
+	.nav .brand .pie-mini { font-size: 1.2rem; }
+	.nav .links { margin-left: auto; display: flex; gap: 1.1rem; align-items: center; }
+	.nav .links a { color: var(--muted); text-decoration: none; font-size: 0.9rem; transition: color 0.15s; }
+	.nav .links a:hover { color: var(--text); }
+	.nav .links .gh { color: var(--gold-soft); border: 1px solid var(--card-brd); padding: 0.32rem 0.75rem; border-radius: 8px; }
+	.nav .links .gh:hover { border-color: var(--gold); color: var(--text); }
+	@media (max-width: 560px) { .nav .links a:not(.gh) { display: none; } }
+
+	/* ── hero ───────────────────────────────────────────────────────── */
+	.hero { padding: 4.5rem 0 2.5rem; text-align: center; }
 	.badge {
 		display: inline-block; font-size: 0.78rem; letter-spacing: 0.02em;
 		color: var(--gold-soft); background: rgba(240, 168, 104, 0.08);
 		border: 1px solid rgba(240, 168, 104, 0.22); border-radius: 999px;
-		padding: 0.3rem 0.85rem; margin-bottom: 1.4rem;
+		padding: 0.3rem 0.85rem; margin-bottom: 1.3rem;
 	}
-	.pie { font-size: 4.5rem; line-height: 1; margin-bottom: 0.6rem; filter: drop-shadow(0 6px 18px rgba(255,122,156,0.35)); }
+	.pie { font-size: 4rem; line-height: 1; margin-bottom: 0.5rem; filter: drop-shadow(0 6px 18px rgba(255,122,156,0.35)); }
 	h1 {
-		font-size: clamp(2.6rem, 7vw, 3.8rem); margin: 0; letter-spacing: -0.03em;
+		font-size: clamp(2.4rem, 6.5vw, 3.6rem); margin: 0; letter-spacing: -0.03em;
 		font-weight: 800; line-height: 1.05;
 		background: linear-gradient(120deg, var(--text) 30%, var(--pink) 70%, var(--gold));
 		-webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 	}
-	.lede {
-		font-size: clamp(1.05rem, 2.4vw, 1.25rem); color: var(--muted);
-		max-width: 640px; margin: 1.1rem auto 0;
+	.hero-sub {
+		font-size: clamp(1.05rem, 2.2vw, 1.2rem); color: var(--muted);
+		max-width: 620px; margin: 1rem auto 0;
 	}
-	.lede strong { color: var(--text); font-weight: 600; }
-
+	.hero-sub strong { color: var(--text); font-weight: 600; }
 	.install {
 		background: var(--bg-soft); border: 1px solid var(--card-brd); border-radius: 12px;
-		padding: 0.95rem 1.2rem; margin: 2rem auto 1rem; max-width: 640px; text-align: left;
-		font-family: var(--mono); font-size: 0.85rem; position: relative; overflow-x: auto;
+		padding: 0.9rem 1.2rem; margin: 1.8rem auto 0.8rem; max-width: 620px; text-align: left;
+		font-family: var(--mono); font-size: 0.84rem; position: relative; overflow-x: auto;
 		box-shadow: 0 10px 40px -12px rgba(0,0,0,0.5);
 	}
 	.install .prompt { color: var(--pink); user-select: none; margin-right: 0.5rem; }
@@ -78,10 +97,10 @@
 		transition: all 0.15s ease;
 	}
 	.copy:hover { color: var(--text); border-color: var(--pink); }
-	.ctas { margin: 1.6rem 0 0; }
+	.ctas { margin: 1.4rem 0 0; }
 	.ctas a {
-		display: inline-block; margin: 0.35rem; padding: 0.7rem 1.4rem; border-radius: 10px;
-		text-decoration: none; font-weight: 600; font-size: 0.97rem; border: 1px solid transparent;
+		display: inline-block; margin: 0.32rem; padding: 0.68rem 1.35rem; border-radius: 10px;
+		text-decoration: none; font-weight: 600; font-size: 0.96rem; border: 1px solid transparent;
 		transition: transform 0.15s ease, box-shadow 0.15s ease;
 	}
 	.ctas .primary {
@@ -92,133 +111,144 @@
 	.ctas .ghost { background: var(--card); color: var(--text); border-color: var(--card-brd); }
 	.ctas .ghost:hover { background: var(--card-hov); }
 
-	/* ── hero pills (the four-word essence, inline) ─────────────────── */
-	.pillrow {
-		display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem;
-		margin: 1.6rem 0 0; padding: 0; list-style: none;
-	}
-	.pillrow .pill {
-		font-size: 0.8rem; letter-spacing: 0.01em; color: var(--gold-soft);
-		background: rgba(240,168,104,0.07); border: 1px solid rgba(240,168,104,0.2);
-		border-radius: 999px; padding: 0.28rem 0.8rem;
-	}
-
 	/* ── section scaffolding ───────────────────────────────────────── */
-	section { padding: 3rem 0; }
+	section { padding: 2.8rem 0; }
 	.eyebrow {
-		font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase;
+		font-size: 0.76rem; letter-spacing: 0.14em; text-transform: uppercase;
 		color: var(--pink); font-weight: 600; margin: 0 0 0.5rem;
 	}
 	h2 {
-		font-size: clamp(1.6rem, 4vw, 2.1rem); margin: 0 0 1rem; letter-spacing: -0.02em;
+		font-size: clamp(1.55rem, 3.6vw, 2.05rem); margin: 0 0 0.8rem; letter-spacing: -0.02em;
 		font-weight: 700; line-height: 1.2;
 	}
 	h2 .accent { color: var(--gold); }
-	p.lead { font-size: 1.08rem; color: var(--muted); max-width: 660px; }
-	ul.pitchpoints { list-style: none; padding: 0; margin: 1.4rem 0 0; max-width: 680px; }
-	ul.pitchpoints li {
-		position: relative; padding: 0.55rem 0 0.55rem 2rem; font-size: 1rem; color: var(--text);
-		border-top: 1px solid var(--card-brd);
-	}
-	ul.pitchpoints li:first-child { border-top: none; }
-	ul.pitchpoints li::before {
-		content: "✓"; position: absolute; left: 0; top: 0.55rem; color: var(--green);
-		font-weight: 800; font-size: 1rem;
-	}
-	ul.pitchpoints strong { color: var(--text); }
-	ul.pitchpoints code { font-family: var(--mono); color: var(--green); background: rgba(127,209,161,0.08); padding: 0.02rem 0.3rem; border-radius: 4px; }
+	p.lead { font-size: 1.04rem; color: var(--muted); max-width: 660px; }
 	.divider { height: 1px; background: linear-gradient(90deg, transparent, var(--card-brd), transparent); margin: 0; }
 
-	/* ── the three powers (immediate proof, high contrast) ─────────── */
-	.powers { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
-	.power {
-		background: linear-gradient(160deg, rgba(255,246,235,0.06), rgba(255,246,235,0.02));
-		border: 1px solid var(--card-brd); border-radius: 14px; padding: 1.4rem 1.3rem;
+	/* ── BENTO: the three big features, asymmetric ─────────────────── */
+	.bento {
+		display: grid; gap: 0.9rem; margin-top: 1.4rem;
+		grid-template-columns: repeat(3, 1fr);
+		grid-template-areas:
+			"big big big"
+			"voice voice integ";
+	}
+	@media (max-width: 860px) {
+		.bento { grid-template-columns: 1fr 1fr; grid-template-areas: "big big" "voice integ"; }
+	}
+	@media (max-width: 600px) {
+		.bento { grid-template-columns: 1fr; grid-template-areas: "big" "voice" "integ"; }
+	}
+	.tile {
+		background: linear-gradient(160deg, rgba(255,246,235,0.055), rgba(255,246,235,0.018));
+		border: 1px solid var(--card-brd); border-radius: 18px; padding: 1.5rem;
+		backdrop-filter: blur(8px); position: relative; overflow: hidden;
 		transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 	}
-	.power:hover {
-		border-color: rgba(255,122,156,0.4); transform: translateY(-3px);
-		box-shadow: 0 14px 34px -16px rgba(232,93,126,0.5);
+	.tile:hover { border-color: rgba(255,122,156,0.4); transform: translateY(-3px); box-shadow: 0 16px 40px -18px rgba(232,93,126,0.5); }
+	.tile .label {
+		display: inline-flex; align-items: center; gap: 0.4rem;
+		font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+		color: var(--gold); margin-bottom: 0.5rem;
 	}
-	.power .pico { font-size: 1.8rem; display: block; margin-bottom: 0.5rem; }
-	.power h3 { margin: 0 0 0.45rem; font-size: 1.08rem; color: var(--gold); letter-spacing: -0.01em; }
-	.power p { margin: 0; font-size: 0.9rem; color: var(--muted); }
-	.power code { font-family: var(--mono); font-size: 0.84rem; color: var(--pink); background: rgba(255,122,156,0.08); padding: 0.05rem 0.32rem; border-radius: 4px; }
+	.tile .label .dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--gold); box-shadow: 0 0 10px var(--gold); }
+	.tile h3 { margin: 0 0 0.4rem; font-size: 1.3rem; letter-spacing: -0.02em; color: var(--text); }
+	.tile p { margin: 0; color: var(--muted); font-size: 0.92rem; }
 
-	/* ── pillars (the four proven advantages) ──────────────────────── */
-	.pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.5rem; }
-	@media (max-width: 820px) { .pillars { grid-template-columns: repeat(2, 1fr); } }
-	@media (max-width: 540px) { .pillars { grid-template-columns: 1fr; } }
-	.pillar {
-		display: flex; flex-direction: column; min-height: 13.5rem;
-		background: var(--card); border: 1px solid var(--card-brd); border-radius: 14px;
-		padding: 1.4rem 1.3rem; backdrop-filter: blur(8px);
-		transition: border-color 0.2s ease, transform 0.2s ease;
+	.tile.big { grid-area: big; padding: 1.9rem; }
+	.tile.big h3 { font-size: clamp(1.5rem, 3vw, 1.9rem); }
+	.tile.voice { grid-area: voice; }
+	.tile.integ { grid-area: integ; }
+
+	/* ── research loop (signature visual, inside the big tile) ──────── */
+	.loop {
+		display: flex; align-items: stretch; gap: 0.4rem; margin-top: 1.3rem; flex-wrap: wrap;
 	}
-	.pillar p { flex: 1; }
-	.pillar:hover { border-color: rgba(255,122,156,0.35); transform: translateY(-3px); }
-	.pillar .ico { font-size: 1.5rem; margin-bottom: 0.6rem; display: block; }
-	.pillar h3 { margin: 0 0 0.5rem; font-size: 1.12rem; color: var(--text); }
-	.pillar p { margin: 0; font-size: 0.93rem; color: var(--muted); }
-	.pillar .tag {
-		display: inline-block; margin-top: 0.85rem; font-size: 0.76rem; font-family: var(--mono);
+	.loop .node {
+		flex: 1 1 130px; background: rgba(0,0,0,0.22); border: 1px solid var(--card-brd);
+		border-radius: 12px; padding: 0.85rem 0.8rem; position: relative;
+	}
+	.loop .node .nn {
+		width: 1.5rem; height: 1.5rem; line-height: 1.5rem; border-radius: 50%; margin-bottom: 0.45rem;
+		font-size: 0.78rem; font-weight: 700; text-align: center; color: #2a1208;
+		background: linear-gradient(120deg, var(--pink), var(--gold));
+	}
+	.loop .node.gate .nn { background: linear-gradient(120deg, var(--green), #4fb87f); }
+	.loop .node.gate { border-color: rgba(127,209,161,0.35); }
+	.loop .node h4 { margin: 0 0 0.25rem; font-size: 0.92rem; color: var(--gold); }
+	.loop .node.gate h4 { color: var(--green); }
+	.loop .node p { margin: 0; font-size: 0.78rem; color: var(--muted); line-height: 1.45; }
+	.loop .arr {
+		display: flex; align-items: center; color: var(--dim); font-size: 1rem; font-weight: 300;
+	}
+	.repeat {
+		margin-top: 0.8rem; font-size: 0.78rem; color: var(--dim); font-family: var(--mono);
+		display: flex; align-items: center; gap: 0.4rem;
+	}
+	.repeat .ring { animation: spin 6s linear infinite; display: inline-block; }
+	@keyframes spin { to { transform: rotate(360deg); } }
+
+	/* ── terminal mock (inside the voice tile) ──────────────────────── */
+	.term {
+		margin-top: 0.9rem; background: rgba(0,0,0,0.32); border: 1px solid var(--card-brd);
+		border-radius: 10px; padding: 0.7rem 0.85rem; font-family: var(--mono); font-size: 0.8rem;
+		color: var(--muted); overflow-x: auto;
+	}
+	.term .p { color: var(--pink); }
+	.term .y { color: var(--green); }
+	.term .mu { color: var(--dim); }
+
+	/* ── bridge chips (integration tile) ────────────────────────────── */
+	.bridges { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.9rem; }
+	.bridges .chip {
+		font-size: 0.76rem; padding: 0.25rem 0.62rem; border-radius: 999px;
+		background: rgba(255,246,235,0.04); border: 1px solid var(--card-brd); color: var(--muted);
+		display: inline-flex; align-items: center; gap: 0.3rem;
+	}
+	.bridges .chip b { color: var(--text); font-weight: 600; }
+	.bridges .chip code { font-family: var(--mono); color: var(--pink); font-size: 0.74rem; }
+
+	/* ── differentiators row (why unique) ──────────────────────────── */
+	.why { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.9rem; margin-top: 1.3rem; }
+	@media (max-width: 720px) { .why { grid-template-columns: 1fr; } }
+	.why .w {
+		background: var(--card); border: 1px solid var(--card-brd); border-radius: 14px; padding: 1.2rem;
+	}
+	.why .w .ico { font-size: 1.4rem; display: block; margin-bottom: 0.4rem; }
+	.why .w h4 { margin: 0 0 0.35rem; font-size: 1rem; color: var(--text); }
+	.why .w p { margin: 0; font-size: 0.86rem; color: var(--muted); }
+	.why .w .tag {
+		display: inline-block; margin-top: 0.7rem; font-size: 0.72rem; font-family: var(--mono);
 		color: var(--green); background: rgba(127,209,161,0.07); border: 1px solid rgba(127,209,161,0.18);
-		border-radius: 5px; padding: 0.15rem 0.5rem;
+		border-radius: 5px; padding: 0.12rem 0.45rem;
 	}
 
 	/* ── flow steps (onboarding lifecycle) ─────────────────────────── */
-	.flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.5rem; margin: 1.8rem 0 0.5rem; }
+	.flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.4rem; margin: 1.6rem 0 0.4rem; }
 	.step {
-		flex: 1 1 130px; background: var(--card); border: 1px solid var(--card-brd);
-		border-radius: 11px; padding: 0.9rem 0.85rem; text-align: center; position: relative;
+		flex: 1 1 120px; background: var(--card); border: 1px solid var(--card-brd);
+		border-radius: 11px; padding: 0.85rem 0.8rem; text-align: center; position: relative;
 	}
 	.step .n {
-		width: 1.6rem; height: 1.6rem; line-height: 1.6rem; border-radius: 50%; margin: 0 auto 0.5rem;
-		font-size: 0.8rem; font-weight: 700; color: #2a1208;
+		width: 1.6rem; height: 1.6rem; line-height: 1.6rem; border-radius: 50%; margin: 0 auto 0.45rem;
+		font-size: 0.78rem; font-weight: 700; color: #2a1208;
 		background: linear-gradient(120deg, var(--pink), var(--gold));
 	}
-	.step .t { font-size: 0.88rem; font-weight: 600; color: var(--text); }
-	.step .s { font-size: 0.76rem; color: var(--dim); margin-top: 0.2rem; }
+	.step .t { font-size: 0.86rem; font-weight: 600; color: var(--text); }
+	.step .s { font-size: 0.74rem; color: var(--dim); margin-top: 0.2rem; }
 	.step.destroy { border-color: rgba(127,209,161,0.35); }
 	.step.destroy .n { background: linear-gradient(120deg, var(--green), #4fb87f); }
-	.arrow {
-		display: flex; align-items: center; color: var(--dim); font-size: 1.1rem;
-		font-weight: 300; user-select: none;
-	}
-
-	/* ── loop diagram (autoresearch) ───────────────────────────────── */
-	.loop { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.8rem; margin-top: 1.5rem; }
-	.loop .node {
-		background: var(--bg-soft); border: 1px solid var(--card-brd); border-radius: 12px;
-		padding: 1.1rem 1rem; position: relative;
-	}
-	.loop .node h4 { margin: 0 0 0.35rem; font-size: 0.96rem; color: var(--gold); }
-	.loop .node p { margin: 0; font-size: 0.84rem; color: var(--muted); }
-	.loop .gate {
-		border-color: rgba(127,209,161,0.35);
-		background: linear-gradient(160deg, rgba(127,209,161,0.06), transparent);
-	}
-	.loop .gate h4 { color: var(--green); }
-
-	/* ── in-the-box grid ───────────────────────────────────────────── */
-	.box { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
-	.box .item {
-		background: var(--card); border: 1px solid var(--card-brd); border-radius: 12px; padding: 1.2rem;
-	}
-	.box .item h3 { margin: 0 0 0.5rem; font-size: 1rem; color: var(--pink); }
-	.box .item p { margin: 0; font-size: 0.88rem; color: var(--muted); }
-	.box .item ul { margin: 0.4rem 0 0; padding-left: 1.1rem; color: var(--dim); font-size: 0.84rem; }
-	.box .item li { margin-bottom: 0.2rem; }
+	.arrow { display: flex; align-items: center; color: var(--dim); font-size: 1.05rem; font-weight: 300; }
 
 	/* ── proof strip ───────────────────────────────────────────────── */
 	.proof {
-		display: flex; flex-wrap: wrap; gap: 1.5rem 2.5rem; margin-top: 1.5rem;
-		padding: 1.4rem 1.6rem; background: var(--card); border: 1px solid var(--card-brd); border-radius: 14px;
+		display: flex; flex-wrap: wrap; gap: 1.4rem 2.4rem; margin-top: 1.4rem;
+		padding: 1.3rem 1.5rem; background: var(--card); border: 1px solid var(--card-brd); border-radius: 14px;
 	}
-	.proof .stat { min-width: 120px; }
+	.proof .stat { min-width: 110px; }
 	.proof .stat .v { font-size: 1.7rem; font-weight: 800; color: var(--text); line-height: 1; }
 	.proof .stat .v .u { color: var(--gold); }
-	.proof .stat .l { font-size: 0.82rem; color: var(--muted); margin-top: 0.3rem; }
+	.proof .stat .l { font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem; }
 
 	footer { text-align: center; padding: 3rem 1.5rem 2.5rem; color: var(--dim); font-size: 0.86rem; }
 	footer a { color: var(--pink); text-decoration: none; }
@@ -228,13 +258,25 @@
 </head>
 <body>
 
+<nav class="nav">
+	<div class="row">
+		<a class="brand" href="#"><span class="pie-mini">🥧</span> apple-pi</a>
+		<div class="links">
+			<a href="#features">Features</a>
+			<a href="#how">How it works</a>
+			<a href="/apple-pi/guide/">Docs</a>
+			<a class="gh" href="https://github.com/jotokra/apple-pi">GitHub ↗</a>
+		</div>
+	</div>
+</nav>
+
 <header class="hero">
 	<div class="wrap">
 		<span class="badge">🥧 a distribution of the Pi Coding Agent · MIT · open source</span>
 		<div class="pie" aria-hidden="true">🥧</div>
-		<h1>apple-pi</h1>
-		<p class="lede">The coding agent that <strong>tunes itself to your model</strong>, <strong>improves itself</strong> from how you use it —
-			and <strong>never changes your config without your <code style="font-family:var(--mono);color:var(--green)">yes</code></strong>. Bring any key; it proves the connection, erases the key, and you're off.</p>
+		<h1>The agent that<br>researches itself.</h1>
+		<p class="hero-sub">apple-pi studies how you work, then proposes its own improvements — <strong>you gate every change</strong>.
+			It talks (voice), drives your real browser, holds your keys, and bridges to your whole stack. Bring any model.</p>
 
 		<div class="install" id="installbox">
 			<button class="copy" onclick="copyInstall()" aria-label="Copy install command">copy</button>
@@ -243,45 +285,109 @@
 
 		<div class="ctas">
 			<a class="primary" href="https://github.com/jotokra/apple-pi">View on GitHub</a>
-			<a class="ghost" href="/apple-pi/guide/">Read the docs</a>
-			<a class="ghost" href="#how">See how it works</a>
+			<a class="ghost" href="#features">See the features</a>
 		</div>
-
-		<ul class="pillrow">
-			<li class="pill">self-tuning</li>
-			<li class="pill">self-improving</li>
-			<li class="pill">private</li>
-			<li class="pill">yours</li>
-		</ul>
 	</div>
 </header>
 
-<!-- ═══ 1 · THE HOOK: what no other agent does ═══ -->
-<section id="what">
+<!-- ═══ THE THREE BIG FEATURES (bento — on first view) ═══ -->
+<section id="features" style="padding-top:1.5rem;">
+	<div class="wrap">
+		<p class="eyebrow">What makes it different</p>
+		<h2>Three things you don't usually get <span class="accent">in one agent.</span></h2>
+
+		<div class="bento">
+
+			<!-- BIG: the research loop (the differentiator) -->
+			<div class="tile big">
+				<span class="label"><span class="dot"></span> Self-improving · the research algo</span>
+				<h3>It runs its own research lab on how you work.</h3>
+				<p>A loop inspired by Karpathy's <em>autoresearch</em> watches your sessions, writes a weekly brief of
+					concrete config improvements — and <strong>never applies one until you say yes.</strong> No other
+					agent does this.</p>
+
+				<div class="loop">
+					<div class="node">
+						<div class="nn">1</div>
+						<h4>collect</h4>
+						<p>daily telemetry from your sessions → local SQLite. No LLM calls, zero quota burn.</p>
+					</div>
+					<div class="arr">→</div>
+					<div class="node">
+						<div class="nn">2</div>
+						<h4>brief</h4>
+						<p>a weekly diff vs last week with reproducible change proposals.</p>
+					</div>
+					<div class="arr">→</div>
+					<div class="node gate">
+						<div class="nn">3</div>
+						<h4>review → apply</h4>
+						<p><code>review</code> shows the diff; <code>apply --yes</code> writes it. <strong>You gate it.</strong></p>
+					</div>
+				</div>
+				<div class="repeat"><span class="ring">↻</span> repeats weekly · two channels: <code>autoresearch</code> (your telemetry) vs <code>release</code> (new code) — both gated.</div>
+			</div>
+
+			<!-- VOICE -->
+			<div class="tile voice">
+				<span class="label"><span class="dot"></span> Voice</span>
+				<h3>Type it, or talk it.</h3>
+				<p>Same conversation. <code>/voice</code> flips the session to on-device speech (whisper.cpp + <code>say</code>); voice turns land right in the session tree.</p>
+				<div class="term">
+					<div><span class="p">&gt;</span> <span class="y">/voice</span> <span class="mu">↳ talking… tap q to exit</span></div>
+					<div><span class="p">&gt;</span> "summarize the weather this week"</div>
+					<div class="mu">… appends to the same session. pi -c resumes.</div>
+				</div>
+			</div>
+
+			<!-- INTEGRATION -->
+			<div class="tile integ">
+				<span class="label"><span class="dot"></span> Integrated in your systems</span>
+				<h3>A real agent, not a demo.</h3>
+				<p>Drives your real browser, holds your keys, and bridges to the tools you already run — all env-configured, nothing baked in.</p>
+				<div class="bridges">
+					<span class="chip">🌐 <b>browser</b></span>
+					<span class="chip">🔐 <b>vault</b></span>
+					<span class="chip">n8n</span>
+					<span class="chip">forgejo</span>
+					<span class="chip">telegram</span>
+					<span class="chip">kanban</span>
+					<span class="chip">netbird</span>
+					<span class="chip"><code>+ your own</code></span>
+				</div>
+			</div>
+
+		</div>
+	</div>
+</section>
+
+<div class="wrap"><div class="divider"></div></div>
+
+<!-- ═══ WHY UNIQUE (the differentiators behind the features) ═══ -->
+<section>
 	<div class="wrap">
 		<p class="eyebrow">Why this, not another wrapper</p>
-		<h2>Other agents hand you a model. <span class="accent">This one runs itself.</span></h2>
-		<p class="lead">apple-pi is a refined <strong>distribution</strong> of the open-source
-			<a href="https://pi.dev" style="color:var(--pink)">Pi Coding Agent</a> — the way a Linux distro wraps a kernel.
-			The engine is Pi's. apple-pi adds the three things that turn a model into an <em>agent you can trust</em>:</p>
+		<h2>The engine is Pi's. <span class="accent">The engineering is apple-pi's.</span></h2>
+		<p class="lead">A frontier model with a leaky key file, a config that doesn't match it, and an improvement loop that
+			silently rewrites your settings is worse than useless. apple-pi makes opinionated, <strong>provable</strong> choices on each:</p>
 
-		<div class="pillars">
-			<div class="pillar">
+		<div class="why">
+			<div class="w">
 				<span class="ico">🎯</span>
-				<h3>It tunes itself to your model</h3>
-				<p>No one-size-fits-all defaults. apple-pi reads your model's <strong>real capabilities</strong> — context window, thinking format, cost — straight from the provider catalog and rewrites its config to match. Switch models, re-tune.</p>
+				<h4>Tunes itself to your model</h4>
+				<p>Reads your model's real capabilities — context window, thinking format, cost — from the provider catalog and rewrites its config. Switch models, re-tune.</p>
 				<span class="tag">grounded in ground truth</span>
 			</div>
-			<div class="pillar">
-				<span class="ico">♻️</span>
-				<h3>It improves itself — safely</h3>
-				<p>A loop (inspired by Karpathy's <em>autoresearch</em>) records how you work and writes a weekly brief of concrete changes — but <strong>never applies one until you say yes.</strong> Self-improvement without the risk.</p>
-				<span class="tag">you gate every change</span>
+			<div class="w">
+				<span class="ico">🔐</span>
+				<h4>Keys that don't leak</h4>
+				<p>Onboarding makes one real call to prove your key works, then destroys it. Keys live in an encrypted, trace-free vault — never your shell history.</p>
+				<span class="tag">verified end-to-end</span>
 			</div>
-			<div class="pillar">
+			<div class="w">
 				<span class="ico">🏠</span>
-				<h3>It's yours, and private</h3>
-				<p>Bring any OpenAI-/Anthropic-/Google-compatible model, including <strong>local</strong> (Ollama — no key, no cost). The shipped config holds <strong>zero</strong> of the author's personal data — a sanitization test enforces it.</p>
+				<h4>Yours, not anyone's</h4>
+				<p>Bring any OpenAI-/Anthropic-/Google-compatible model, including <strong>local</strong> (Ollama — no key, no cost). Shipped config has zero of the author's personal data.</p>
 				<span class="tag">no lock-in, no leaks</span>
 			</div>
 		</div>
@@ -290,37 +396,7 @@
 
 <div class="wrap"><div class="divider"></div></div>
 
-<!-- ═══ 2 · CAPABILITIES: a real agent, not a demo ═══ -->
-<section>
-	<div class="wrap">
-		<p class="eyebrow">And it's a real agent, not a demo</p>
-		<h2>Three things it can do <span class="accent">out of the box.</span></h2>
-		<div class="pillars">
-			<div class="pillar">
-				<span class="ico">🎙️</span>
-				<h3>Voice mode</h3>
-				<p>Type a prompt or <strong>speak it</strong> — same conversation. <code>/voice</code> flips the session to on-device speech (whisper.cpp + <code>say</code>); voice turns land right in the session tree.</p>
-				<span class="tag">type ⇄ talk</span>
-			</div>
-			<div class="pillar">
-				<span class="ico">🌐</span>
-				<h3>Web &amp; browser control</h3>
-				<p>Search the web, read pages, and drive <strong>your own headed Chrome</strong> — click, type, fill forms, screenshot. It confirms before anything irreversible.</p>
-				<span class="tag">sees &amp; acts</span>
-			</div>
-			<div class="pillar">
-				<span class="ico">🔐</span>
-				<h3>Credential vault</h3>
-				<p>An encrypted, trace-free key store. Onboarding proves your key works, then destroys it. Paste keys into a <strong>masked prompt</strong> — dots, not glyphs — that <strong>never reaches your input line, session log, or shell history.</strong></p>
-				<span class="tag">verified end-to-end</span>
-			</div>
-		</div>
-	</div>
-</section>
-
-<div class="wrap"><div class="divider"></div></div>
-
-<!-- ═══ 3 · HOW ONBOARDING WORKS ═══ -->
+<!-- ═══ HOW ONBOARDING WORKS ═══ -->
 <section id="how">
 	<div class="wrap">
 		<p class="eyebrow">How onboarding works</p>
@@ -342,17 +418,16 @@
 			<div class="arrow">→</div>
 			<div class="step"><div class="n">6</div><div class="t">Agent ready</div><div class="s">tuned to your model</div></div>
 		</div>
-		<p style="color:var(--dim); font-size:0.85rem; margin-top:1rem;">
-			Stuck on step 2? The built-in <strong>key guide</strong> walks you through getting a key for ten providers
-			(OpenAI, Anthropic, Google, DeepSeek, MiniMax, Mistral, Groq, OpenRouter, xAI, Ollama) — with pricing,
-			free tiers, and the errors you'll actually hit. Works with zero credentials.
+		<p style="color:var(--dim); font-size:0.84rem; margin-top:0.9rem;">
+			Stuck on step 2? The built-in <strong>key guide</strong> covers ten providers (OpenAI, Anthropic, Google,
+			DeepSeek, MiniMax, Mistral, Groq, OpenRouter, xAI, Ollama) — pricing, free tiers, the errors you'll hit.
 		</p>
 	</div>
 </section>
 
 <div class="wrap"><div class="divider"></div></div>
 
-<!-- ═══ 4 · IN THE BOX ═══ -->
+<!-- ═══ IN THE BOX ═══ -->
 <section>
 	<div class="wrap">
 		<p class="eyebrow">In the box</p>
@@ -364,36 +439,12 @@
 			<div class="stat"><div class="v">10</div><div class="l">provider guides</div></div>
 			<div class="stat"><div class="v">0<span class="u">B</span></div><div class="l">tracked personal data</div></div>
 		</div>
-
-		<div class="box" style="margin-top:1.5rem;">
-			<div class="item">
-				<h3>The persona</h3>
-				<p>A senior-engineer + security-reviewer contract, loaded every session: read before you touch,
-					spec before you build, verify your own work, red/blue (find + fix the ways it breaks).</p>
-			</div>
-			<div class="item">
-				<h3>The skills</h3>
-				<p>Reusable methodologies, not prompts:</p>
-				<ul>
-					<li>plan-decompose · read-docs-first</li>
-					<li>verify-own-work · red-blue</li>
-					<li>self-assess · session-record</li>
-					<li>long-horizon-compaction · n8n-author</li>
-				</ul>
-			</div>
-			<div class="item">
-				<h3>The extensions</h3>
-				<p>Optional tools, all env-configured (no baked-in endpoints):</p>
-				<ul>
-					<li>sysinfo-guard (always on — blocks <code>rm -rf /</code>)</li>
-					<li><strong>web</strong> — search · fetch · drive your headed Chrome (default on)</li>
-					<li><strong>voice</strong> — <code>/voice</code> flips the session to pivoice (type ⇄ talk)</li>
-					<li><strong>credential-vault</strong> — encrypted, trace-free key store (<code>/vault</code>)</li>
-					<li>n8n · forgejo · netbird · llm-sidecar</li>
-					<li>kanban · telegram</li>
-				</ul>
-			</div>
-		</div>
+		<p style="color:var(--dim); font-size:0.84rem; margin-top:1rem;">
+			The persona (senior-engineer + red/blue teamer contract) · the skills (plan-decompose, read-docs-first,
+			verify-own-work, red-blue, self-assess, session-record, long-horizon-compaction, n8n-author) · the
+			extensions (sysinfo-guard, web, voice, credential-vault, n8n, forgejo, netbird, llm-sidecar, kanban, telegram).
+			All env-configured — no baked-in endpoints, ever.
+		</p>
 	</div>
 </section>
 
