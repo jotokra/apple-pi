@@ -15,8 +15,10 @@
 
 "use strict";
 const fs = require("node:fs");
+const path = require("node:path");
 const {
-	ensureVault, addEntry, listEntries, getEntry, removeEntry, pruneTransient,
+	ensureVault, addEntry, rotateEntry, listEntries, getEntry, removeEntry,
+	pruneTransient, importEntries, parseImportFile, shredFile, exportToAuth,
 	vaultPath,
 } = require("./lib/vault");
 
@@ -85,6 +87,9 @@ function usage() {
   vault get <id>                   prints the secret to stdout  (privileged)
   vault remove <id>
   vault prune-transient            reap transient entries older than 24h (R6)
+  vault rotate <id>                replace an existing entry's secret (stdin)
+  vault import <file>              bulk-load entries from JSON, then shred source
+  vault export <id> [--provider P] write the secret into auth.json (api_key shape)
 
 Passphrase: set CREDENTIALS_VAULT_PASS for non-interactive use, or it is
 prompted on the tty. Vault: ${vaultPath()}
@@ -163,6 +168,48 @@ function run(argv) {
 		case "prune-transient": {
 			const n = pruneTransient(pass);
 			process.stdout.write(`pruned ${n} stale transient entr${n === 1 ? "y" : "ies"}\n`);
+			return 0;
+		}
+		case "rotate": {
+			const { positional } = parseFlags(rest, new Set([]));
+			const id = positional[0];
+			if (!id) { process.stderr.write("vault rotate: id required\n"); return 2; }
+			// rotate implies the entry already exists; refuse early (before consuming
+			// stdin) so the user isn't prompted for a secret they can't use.
+			if (!getEntry(pass, id)) {
+				process.stderr.write(`vault rotate: no entry '${id}' (use 'add' to create)\n`);
+				return 1;
+			}
+			const secret = readSecretFromStdin();
+			if (!secret) { process.stderr.write("vault rotate: secret was empty\n"); return 2; }
+			const r = rotateEntry(pass, { id, secret });
+			process.stdout.write(`${r.rotated ? "rotated" : "could not rotate"} vault entry: ${id}\n`);
+			return r.rotated ? 0 : 1;
+		}
+		case "import": {
+			const { positional } = parseFlags(rest, new Set([]));
+			const file = positional[0];
+			if (!file) { process.stderr.write("vault import: file path required\n"); return 2; }
+			const resolved = path.resolve(file);
+			let entries;
+			try { entries = parseImportFile(resolved); }
+			catch (e) { process.stderr.write(`vault import: ${e.message}\n`); return 2; }
+			const r = importEntries(pass, entries);
+			const shredded = shredFile(resolved);
+			process.stdout.write(
+				`imported ${r.imported} entr${r.imported === 1 ? "y" : "ies"}` +
+					(r.errors.length ? ` (${r.errors.length} error${r.errors.length === 1 ? "" : "s"})` : "") +
+					(shredded ? "; source shredded" : "; WARNING: could not shred source — remove it manually") + "\n",
+			);
+			return r.errors.length ? 1 : 0;
+		}
+		case "export": {
+			const { positional, flags } = parseFlags(rest, new Set(["provider"]));
+			const id = positional[0];
+			if (!id) { process.stderr.write("vault export: id required\n"); return 2; }
+			const r = exportToAuth(pass, id, { provider: flags.provider });
+			if (!r.wrote) { process.stderr.write(`vault export: ${r.reason}\n`); return 1; }
+			process.stdout.write(`exported '${id}' → auth.json['${r.provider}']\n`);
 			return 0;
 		}
 		default:
