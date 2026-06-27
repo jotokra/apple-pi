@@ -18,13 +18,17 @@
  *   /vault export <id> [--provider P]  write the secret into auth.json (api_key shape)
  *
  * Entry-path security (see .docs/features/credential-vault/SECURITY.md):
- *   v1 uses ctx.ui.input (a UI dialog, separate from the typed input line) +
- *   immediate setEditorText("") clear as the capture. The PREFERRED path is a
- *   custom masked overlay (ctx.custom + onTerminalInput rendering dots); that
- *   is a follow-up. The trace-free test (smoke/vault-tracefree.sh, REQ-CV-7)
- *   is the safety net: it FAILS the build if the chosen path leaks the secret
- *   into the session transcript, telemetry, or logs. If it leaks, the overlay
- *   ships. The handler always returns void and never notifies with a secret.
+ *   The PREFERRED capture is a custom masked overlay (ctx.ui.custom + a
+ *   MaskedInputOverlay component rendering dots via pi-tui's matchesKey /
+ *   decodePrintableKey) — the secret NEVER appears as a plaintext glyph
+ *   (defeats shoulder-surf / screen-recorder during entry) and the buffer
+ *   lives only on the component, never the main input editor. Falls back to
+ *   ctx.ui.input (plaintext-while-typing, still trace-free) when the overlay
+ *   is unavailable (non-TUI mode, or custom() throws). The trace-free test
+ *   (smoke/vault-tracefree.sh, REQ-CV-7) is the safety net: it FAILS the
+ *   build if the chosen path leaks the secret into the session transcript,
+ *   telemetry, or logs. The handler always returns void and never notifies
+ *   with a secret.
  *
  * The crypto core lives in the apple-pi repo at vault/lib/vault.js (single
  * source of truth — no duplicated crypto). The extension locates the repo via
@@ -36,6 +40,10 @@
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+// pi-tui key utilities — verified exports of @earendil-works/pi-tui (see the
+// installed package's dist/keys.d.ts). Used by the masked-entry overlay (F1)
+// to parse raw terminal keystrokes without hand-rolling escape sequences.
+import { Key, matchesKey, decodePrintableKey, type TUI, type Theme, type Component } from "@earendil-works/pi-tui";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -104,6 +112,111 @@ function parseArgs(args: string): { positional: string[]; flags: Record<string, 
 	return out;
 }
 
+// ── F1: masked entry overlay ─────────────────────────────────────────
+// The preferred secret-capture path: a focused TUI overlay (ctx.ui.custom)
+// that renders dots and parses raw keystrokes via pi-tui. The secret NEVER
+// appears as a plaintext glyph (defeats shoulder-surf / screen-recorder
+// during entry), and the buffer lives only on the component instance (never
+// the main input editor, so it can't enter the session transcript).
+//
+// Falls back to ctx.ui.input (the v1 path) when overlay capture is
+// unavailable (non-TUI mode, or custom() throws). REQ-CV-7's tracefree smoke
+// re-asserts trace-freeness regardless of which path runs.
+class MaskedInputOverlay implements Component {
+	private buffer = "";
+	private tui: TUI;
+	private prompt: string;
+	private done: (result: string | undefined) => void;
+	private dotRow: (prompt: string, bufferLen: number, width: number) => string;
+	constructor(
+		tui: TUI,
+		prompt: string,
+		done: (result: string | undefined) => void,
+		dotRow: (prompt: string, bufferLen: number, width: number) => string,
+	) {
+		this.tui = tui;
+		this.prompt = prompt;
+		this.done = done;
+		this.dotRow = dotRow;
+	}
+	// REQUIRED by Component. Render the label + dots, one dot per buffered
+	// char. Lines must NEVER exceed `width` (pi crashes otherwise — verified
+	// in the TUI source). The dot count comes from the shared pure helper
+	// vault.js#maskedDotRow, unit-tested for the width invariant (R-F1a).
+	render(width: number): string[] {
+		const dots = this.dotRow(this.prompt, this.buffer.length, width);
+		// dim the prompt, show dots at full intensity. No plaintext glyph emitted.
+		return [`\x1b[2m${this.prompt}\x1b[0m ${dots}`];
+	}
+	// REQUIRED (no-op; the overlay has no cached render state beyond `buffer`).
+	invalidate(): void { /* stateless beyond this.buffer */ }
+	handleInput(data: string): void {
+		// submit
+		if (matchesKey(data, Key.enter) || matchesKey(data, Key.return)) {
+			this.finish(this.buffer);
+			return;
+		}
+		// cancel (escape OR ctrl-c, matching how pi's own dialogs behave)
+		if (matchesKey(data, Key.escape) || matchesKey(data, Key.esc) || matchesKey(data, Key.ctrl("c"))) {
+			this.finish(undefined);
+			return;
+		}
+		// clear line (ctrl-u, the shell convention)
+		if (matchesKey(data, Key.ctrl("u"))) {
+			this.buffer = "";
+			this.tui.requestRender();
+			return;
+		}
+		// backspace / delete-last
+		if (matchesKey(data, Key.backspace) || matchesKey(data, Key.delete)) {
+			if (this.buffer.length > 0) {
+				this.buffer = this.buffer.slice(0, -1);
+				this.tui.requestRender();
+			}
+			return;
+		}
+		// printable chars (handles a multi-char paste by walking each char).
+		// decodePrintableKey rejects non-printables (ctrl/alt combos, escape
+		// sequences) so they can't pollute the buffer.
+		for (const ch of data) {
+			const p = decodePrintableKey(ch);
+			if (p) this.buffer += p;
+		}
+		if (this.buffer) this.tui.requestRender();
+	}
+	private finish(result: string | undefined): void {
+		// zero the buffer, then resolve. The secret lived only on this instance.
+		this.buffer = "";
+		this.done(result);
+	}
+	dispose?(): void { this.buffer = ""; }
+}
+
+// Capture a secret via the masked overlay (preferred), falling back to the
+// v1 ctx.ui.input path. Returns the secret, or undefined if cancelled/empty.
+// NEVER accepts the secret as a command argument (REQ-CV-3, enforced by callers).
+// `core` is the vault core (provides maskedDotRow, the shared render helper).
+async function captureSecret(ctx: ExtensionCommandContext, core: any, prompt: string): Promise<string | undefined> {
+	// Preferred: the masked overlay (TUI only).
+	if (ctx.mode === "tui") {
+		try {
+			const secret = await ctx.ui.custom<string | undefined>((tui, _theme, _kb, done) => {
+				return new MaskedInputOverlay(tui, prompt, done, core.maskedDotRow);
+			}, { overlay: true, overlayOptions: { width: "80%", anchor: "center", margin: { top: 1 } } });
+			if (secret !== undefined) return secret; // undefined = cancelled
+			return undefined;
+		} catch {
+			// custom() unavailable or threw — fall through to the input path.
+		}
+	}
+	// Fallback: ctx.ui.input (a UI dialog, NOT the main editor — still trace-free
+	// per REQ-CV-7; just shows plaintext while typing, which the overlay avoids).
+	if (!ctx.hasUI) { ctx.ui.notify("vault: secret capture needs a TUI (run in interactive mode)", "error"); return undefined; }
+	const secret = await ctx.ui.input(prompt);
+	try { (ctx.ui as any).setEditorText?.(""); } catch { /* not all contexts */ }
+	return secret;
+}
+
 // REQ-CV-3: refuse secrets passed as arguments. The heuristic lives in the
 // shared core (vault/lib/vault.js looksLikeSecret) so the CLI + extension +
 // tests all agree on what counts as a pasted credential.
@@ -124,10 +237,9 @@ async function cmdAdd(ctx: ExtensionCommandContext, core: any, args: string): Pr
 	const id = positional[0] || (await ctx.ui.input("Entry id (e.g. openai, anthropic, gateway)"));
 	if (!id) { ctx.ui.notify("vault add: no id", "warning"); return; }
 
-	// Capture the secret via the UI dialog (NOT the typed input line).
-	const secret = await ctx.ui.input(`Paste the secret for "${id}" (it will not be shown)`);
-	// Immediately clear any editor residue (defense in depth).
-	try { (ctx.ui as any).setEditorText?.(""); } catch { /* not all contexts */ }
+	// Capture the secret via the masked overlay (preferred) / input fallback.
+	// NEVER the typed input line (REQ-CV-3 + trace-free entry, REQ-CV-7).
+	const secret = await captureSecret(ctx, core, `Paste the secret for "${id}" (masked: dots only)`);
 	if (!secret) { ctx.ui.notify("vault add: no secret entered — nothing stored", "warning"); return; }
 
 	const lifetime = flags.lifetime === "transient" ? "transient" : "persistent";
@@ -211,8 +323,7 @@ async function cmdRotate(ctx: ExtensionCommandContext, core: any, args: string):
 	if (!exists) { ctx.ui.notify(`vault rotate: no entry "${id}" (use /vault add to create)`, "warning"); return; }
 	const confirmRotate = await ctx.ui.confirm("Rotate secret?", `Replace the secret for "${id}" with a new one?`);
 	if (!confirmRotate) return;
-	const secret = await ctx.ui.input(`Paste the NEW secret for "${id}" (it will not be shown)`);
-	try { (ctx.ui as any).setEditorText?.(""); } catch { /* not all contexts */ }
+	const secret = await captureSecret(ctx, core, `Paste the NEW secret for "${id}" (masked: dots only)`);
 	if (!secret) { ctx.ui.notify("vault rotate: no secret entered — nothing changed", "warning"); return; }
 	try {
 		const r = core.rotateEntry(cachedPass!, { id, secret });

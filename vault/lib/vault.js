@@ -386,6 +386,23 @@ function exportToAuth(passphrase, id, opts = {}) {
 	return { wrote: true, provider };
 }
 
+// ── masked-entry render helper (F1; shared by the TUI overlay + smoke) ──
+// Pure: compute the single rendered line for a masked secret field. Returns
+// the DOT ROW only (no label) so the caller controls framing. The contract
+// is "never emits more than `width` visible columns" — pi's TUI crashes if a
+// rendered line exceeds the viewport width (verified in the TUI source), so
+// this is the load-bearing invariant (R-F1a), unit-tested in the smoke.
+//
+// `visibleLen(prompt)` accounts for the prompt + a separating space; the dot
+// budget is whatever remains. Never returns a negative dot count.
+function maskedDotRow(prompt, bufferLen, width) {
+	if (typeof width !== "number" || !Number.isFinite(width) || width < 0) return "";
+	const promptLen = typeof prompt === "string" ? prompt.length : 0;
+	// reserve prompt + 1 space; never go below 0 dots.
+	const dotBudget = Math.max(0, Math.floor(width) - promptLen - 1);
+	return "•".repeat(Math.min(Math.max(0, bufferLen | 0), dotBudget));
+}
+
 module.exports = {
 	VAULT_VERSION,
 	TRANSIENT_MAX_AGE_MS,
@@ -393,7 +410,7 @@ module.exports = {
 	readVault, writeVault, ensureVault, modifyVault,
 	addEntry, rotateEntry, listEntries, getEntry, removeEntry, pruneTransient,
 	importEntries, parseImportFile, shredFile, exportToAuth,
-	looksLikeSecret,
+	looksLikeSecret, maskedDotRow,
 	// exported for testing only (NOT for echoing secrets):
 	_findEntryForTest: findEntry,
 };
