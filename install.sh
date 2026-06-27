@@ -385,6 +385,27 @@ if [[ -n "$BASE_URL" ]]; then
 	ok "wrote $MODELS_OUT (baseUrl override for $AUTH_PROVIDER)"
 fi
 
+# ── mirror the key into the persistent credential vault (REQ-CV-4) ────
+# onboarding.vault (the transient full-creds carrier above) is shredded at
+# confirm. credentials.vault is the NEW persistent user-facing store: we mirror
+# the API key here as a `transient` entry so (a) the vault is initialized during
+# onboarding and (b) a crashed confirm leaves a reapable entry. At confirm we
+# prune transient entries; any PERSISTENT entry the user added later survives.
+# The onboarding key ALSO lands in auth.json (the live-use path) — unchanged.
+# This is best-effort: if node or the vault core is missing, onboarding still
+# works via onboarding.vault + auth.json (the v1 path).
+if [[ -n "$API_KEY" ]] && command -v node >/dev/null 2>&1 && [[ -f "$REPO_DIR/vault/lib/vault.js" ]]; then
+	if CREDENTIALS_VAULT_PASS="$VAULT_PASS" PI_CODING_AGENT_DIR="$PI_DIR" \
+		node "$REPO_DIR/bin/apple-pi" vault add onboarding \
+			--provider "$AUTH_PROVIDER" --lifetime transient \
+			--note "onboarding (auto-pruned on confirm)" \
+			<<<"$API_KEY" >/dev/null 2>&1; then
+		ok "mirrored key into credentials.vault (transient; pruned on confirm)"
+	else
+		warn "could not mirror key into credentials.vault (continuing — onboarding.vault + auth.json still work)"
+	fi
+fi
+
 # Record the source repo for future updates.
 printf '%s\n' "$REPO_DIR" > "$SOURCE_MARKER"
 
@@ -474,6 +495,16 @@ if [[ "$CONFIRMED" == 1 ]]; then
 	secure_shred "$VAULT"
 	rm -rf "$SCRATCH"
 	ok "destroyed: onboarding.vault + scratch dir (encrypted creds gone)"
+	# REQ-CV-4: remove the TRANSIENT entry we mirrored into credentials.vault.
+	# (Targeted removal of the "onboarding" id — NOT prune-transient, which is
+	# age-gated 24h for R6 crash recovery. Any PERSISTENT entry the user added
+	# now or later via /vault add survives intact.) Best-effort.
+	if command -v node >/dev/null 2>&1 && [[ -f "$REPO_DIR/vault/lib/vault.js" ]]; then
+		if CREDENTIALS_VAULT_PASS="$VAULT_PASS" PI_CODING_AGENT_DIR="$PI_DIR" \
+			node "$REPO_DIR/bin/apple-pi" vault remove onboarding >/dev/null 2>&1; then
+			ok "removed transient entry from credentials.vault (persistent entries kept)"
+		fi
+	fi
 	# settings.json is the INTERNAL SEED (marked _applepi_seed=true). It is NOT yet the
 	# user's config — P3 rewrites it clean (strips the seed marker + every _comment field,
 	# retunes to the model). We keep it as the seed because Pi needs a settings.json to
