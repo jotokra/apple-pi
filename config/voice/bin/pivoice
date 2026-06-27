@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# pivoice — voice front-end for the pi agent (bundled with apple-pi).
+# Launches the vendored pivoice.py with python3.
+set -e
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec python3 "$DIR/pivoice.py" "$@"
