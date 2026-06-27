@@ -1,0 +1,14 @@
+{
+  "name": "apple-pi-docs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Docs-site tooling for apple-pi (VitePress). The shipped product does not depend on this package; it only builds the rendered guide at https://jotokra.github.io/apple-pi/guide/.",
+  "scripts": {
+    "docs:dev": "vitepress dev guide",
+    "docs:build": "vitepress build guide",
+    "docs:preview": "vitepress preview guide"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}
