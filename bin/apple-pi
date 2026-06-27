@@ -149,4 +149,11 @@ function main() {
 	}
 }
 
-process.exit(main() ?? 0);
+// main() may return a Promise<number> (the vault export-to path spawns a
+// child). Await it before exiting so the spawned command can complete.
+const result = main();
+if (result && typeof result.then === "function") {
+	result.then((code) => process.exit(code ?? 0)).catch((e) => { console.error(String(e)); process.exit(1); });
+} else {
+	process.exit(result ?? 0);
+}

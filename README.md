@@ -100,6 +100,7 @@ and session transcripts.
 /vault rotate <name>           replace a key with a new one
 /vault import <file>           bulk-load from JSON, then shred the source
 /vault export <name>           write a key into auth.json (pi's native auth)
+/vault export-to <name>        run your `vault.exportCmd` with the key on stdin
 /vault remove <name> · /vault lock
 ```
 
