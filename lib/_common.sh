@@ -38,7 +38,12 @@ _input_eof() {
 	echo >&2
 	echo "${C_RED}✗ apple-pi: input closed (EOF).${C_OFF}" >&2
 	echo "${C_RED}  Run apple-pi from an interactive terminal, or pipe answers via stdin.${C_OFF}" >&2
+	# A bare `exit` only ends the current subshell (ask/select_option/yorn run
+	# inside `$(...)`), so the caller would loop on the empty result. Kill the
+	# top-level shell: `$$` is the ORIGINAL shell pid even from a subshell. Escalate
+	# TERM → KILL so a trapped/deferred TERM can't strand the caller.
 	kill -TERM "$$" 2>/dev/null || true
+	kill -KILL "$$" 2>/dev/null || true
 	exit 130
 }
 
