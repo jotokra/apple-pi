@@ -25,7 +25,8 @@
     "keepRecentTokens": 64000
   },
   "extensions": [
-    "__APPLEPI_EXT_SYSINFO__"
+    "__APPLEPI_EXT_SYSINFO__",
+    "__APPLEPI_EXT_WEB__"
   ],
   "skills": [
     "__APPLEPI_SKILLS_DIR__"
@@ -37,6 +38,13 @@
   "shellPath": "__APPLEPI_SHELL__",
   "sessionDir": "__APPLEPI_SESSIONS_DIR__",
   "tools": {
-    "allow": ["read", "write", "edit", "bash", "grep", "find", "ls"]
+    "allow": [
+      "read", "write", "edit", "bash", "grep", "find", "ls",
+      "web_search", "web_fetch",
+      "browser_navigate", "browser_snapshot", "browser_click", "browser_type",
+      "browser_set_checkbox", "browser_select_option", "browser_press_key",
+      "browser_hover", "browser_wait", "browser_screenshot", "browser_eval",
+      "browser_tabs", "browser_close"
+    ]
   }
 }

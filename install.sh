@@ -317,6 +317,23 @@ _install_tree skills
 _install_tree prompts
 _install_tree extensions
 
+# Web bundle ships with its own package.json (playwright + node-html-parser).
+# Best-effort `npm install` so its tools work out of the box; never fail the
+# whole onboarding if Node/npm are missing or it errors (tools degrade with a
+# helpful message instead).
+WEB_DIR="$PI_DIR/extensions/web"
+if [[ -d "$WEB_DIR" && -f "$WEB_DIR/package.json" ]]; then
+	if command -v npm >/dev/null 2>&1; then
+		if (cd "$WEB_DIR" && npm install --no-audit --no-fund >/dev/null 2>&1); then
+			ok "web bundle deps installed ($WEB_DIR)"
+		else
+			warn "web bundle npm install failed — run it later: (cd $WEB_DIR && npm install)"
+		fi
+	else
+		warn "npm not found — web bundle deps not installed (browser/search tools will prompt to install)"
+	fi
+fi
+
 # persona (agent/AGENTS.md) persists; settings.json is rendered from template.
 cp "$REPO_DIR/config/agent/AGENTS.md" "$AGENT_DIR/AGENTS.md" || die "failed to copy persona"
 ok "installed persona → $AGENT_DIR/AGENTS.md"
@@ -324,6 +341,7 @@ ok "installed persona → $AGENT_DIR/AGENTS.md"
 # Resolve shell + dirs for the template.
 SHELL_BIN="$(command -v zsh || command -v bash || echo /bin/sh)"
 EXT_SYSINFO="$PI_DIR/extensions/sysinfo-guard.ts"
+EXT_WEB="$PI_DIR/extensions/web"
 
 # Render settings.json from the template.
 TEMPLATE="$REPO_DIR/config/agent/settings.json.template"
@@ -337,6 +355,7 @@ sed \
 	-e "s#__APPLEPI_PROVIDER__#${RESOLVED_PROVIDER}#g" \
 	-e "s#__APPLEPI_MODEL__#${MODEL}#g" \
 	-e "s#__APPLEPI_EXT_SYSINFO__#${EXT_SYSINFO}#g" \
+	-e "s#__APPLEPI_EXT_WEB__#${EXT_WEB}#g" \
 	-e "s#__APPLEPI_SKILLS_DIR__#$PI_DIR/skills#g" \
 	-e "s#__APPLEPI_PROMPTS_DIR__#$PI_DIR/prompts#g" \
 	-e "s#__APPLEPI_SHELL__#${SHELL_BIN}#g" \
