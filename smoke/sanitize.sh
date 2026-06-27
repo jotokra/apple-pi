@@ -36,7 +36,7 @@ FORBIDDEN=(
 )
 
 # Explicit shipped surface (none of these contain a .git dir).
-SCAN_PATHS=(config lib install.sh README.md LICENSE .docs)
+SCAN_PATHS=(config lib install.sh README.md LICENSE .docs docs)
 
 header "sanitize: scanning ${SCAN_PATHS[*]}"
 for p in "${SCAN_PATHS[@]}"; do
