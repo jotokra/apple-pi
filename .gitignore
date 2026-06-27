@@ -3,6 +3,8 @@
 **/auth.json
 **/onboarding.vault
 **/onboarding.vault.*
+**/credentials.vault
+**/credentials.vault.*
 **/.onboarding/
 discovery.json
 self-assessment-*.md
