@@ -11,7 +11,10 @@ source ./smoke/_lib.sh
 header "required files present"
 for f in install.sh README.md LICENSE .gitignore .docs/PLAN.md \
 		config/agent/AGENTS.md config/agent/settings.json.template \
-		lib/_common.sh lib/handoff.md; do
+		lib/_common.sh lib/handoff.md \
+		lifecycle/collect-metrics.js lifecycle/aggregate-week.js lifecycle/apply-update.js \
+		lifecycle/lib/db.js lifecycle/lib/brief.js lifecycle/schema.sql lifecycle/schedule.sh \
+		bin/apple-pi docs/index.html PUBLISHING.md; do
 	[[ -f "$f" ]] || { fail "missing $f"; exit 1; }
 done
 ok "required files"
@@ -72,9 +75,24 @@ rm -rf "$TMP"
 header "install.sh + lib syntax"
 bash -n install.sh || { fail "install.sh syntax"; exit 1; }
 bash -n lib/_common.sh || { fail "_common.sh syntax"; exit 1; }
+bash -n lifecycle/schedule.sh || { fail "schedule.sh syntax"; exit 1; }
 for s in smoke/*.sh; do bash -n "$s" || { fail "$s syntax"; exit 1; }
 done
 ok "shell syntax clean"
+
+header "lifecycle node files compile"
+for j in lifecycle/collect-metrics.js lifecycle/aggregate-week.js lifecycle/apply-update.js \
+		lifecycle/lib/db.js lifecycle/lib/brief.js bin/apple-pi; do
+	node --check "$j" || { fail "$j syntax"; exit 1; }
+done
+ok "lifecycle + CLI node syntax clean"
+
+header "landing page + workflow present"
+[[ -f docs/index.html ]] || { fail "docs/index.html"; exit 1; }
+[[ -f .github/workflows/pages.yml ]] || { fail "pages workflow"; exit 1; }
+grep -q 'curl -fsSL https://jotokra.github.io/apple-pi/install.sh' docs/index.html \
+	|| { fail "landing page missing the one-liner"; exit 1; }
+ok "landing page + one-liner"
 
 header "extensions type-check (tsc if available)"
 if command -v tsc >/dev/null 2>&1; then
