@@ -17,8 +17,16 @@ clone-and-run repo. **Zero personal information is shipped** — the
 
 ## Quick start
 
+**One line:**
+
 ```bash
-git clone https://github.com/<your-user>/apple-pi.git
+curl -fsSL https://jotokra.github.io/apple-pi/install.sh | bash
+```
+
+…or clone-and-run:
+
+```bash
+git clone https://github.com/jotokra/apple-pi.git
 cd apple-pi
 bash install.sh
 ```
@@ -115,6 +123,23 @@ the prompts, and `/skill:self-assess` to re-tune when your stack changes.
 | `--sandbox <dir>` | Use `<dir>` as the Pi config dir (testing; never touches `~/.pi`). |
 | `--skip-confirm` | Skip the live model-confirm call (air-gapped / OAuth flows). |
 | `--no-handoff` | Stop after P1+purge; print the handoff command. |
+
+## The autoresearch lifecycle (keeps improving)
+
+An internal self-improvement loop runs alongside the interactive `self-assess`
+ritual:
+
+- **Daily** — `apple-pi collect` parses session telemetry into a local SQLite
+  store. LLM-free, zero quota.
+- **Weekly** — `apple-pi aggregate` writes a brief of proposed improvements
+  (tool-discipline drift, compaction pressure, error rates) to
+  `~/.pi/agent/proposals/<date>.md`.
+- **Review → apply** — `apple-pi review` shows the diff; `apple-pi apply
+  --latest --yes` writes it. **Nothing applies until you say yes.**
+
+Install the schedule with `apple-pi schedule install` (launchd on macOS, cron
+elsewhere). See [PUBLISHING.md](PUBLISHING.md) and
+[.docs/decisions/2026-06-27-autoresearch-lifecycle.md](.docs/decisions/2026-06-27-autoresearch-lifecycle.md).
 
 ## Verify it
 
