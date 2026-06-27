@@ -1,0 +1,92 @@
+#!/usr/bin/env node
+// bin/apple-pi — the autoresearch lifecycle CLI.
+//
+//   apple-pi collect [--date YYYY-MM-DD|--all]   daily metrics (cron calls this)
+//   apple-pi aggregate [--dry|--end YYYY-MM-DD]  weekly brief + proposal
+//   apple-pi review [--latest]                   show the latest proposal (read-only)
+//   apple-pi apply   [--latest] [--dry] [--yes]  apply the latest proposal (--yes required to write)
+//   apple-pi reject  [--latest]                  reject the latest proposal
+//   apple-pi status                            show the lifecycle state (runs/proposals/schedule)
+//   apple-pi schedule <install|status|remove|run-now>  manage the daily+weekly jobs
+//
+// Dispatches to lifecycle/*.js. The daily collect + weekly aggregate are the
+// only scheduled jobs; review/apply/reject are interactive (the user drives them).
+
+"use strict";
+const { execFileSync, spawnSync } = require("node:child_process");
+const path = require("node:path");
+const { open, piDir, dbPath } = require("../lifecycle/lib/db");
+
+const REPO = path.resolve(__dirname, "..");
+const LIFECYCLE = path.join(REPO, "lifecycle");
+const SCHED = path.join(REPO, "lifecycle", "schedule.sh");
+
+function nodeRun(script, args = []) {
+	const full = path.join(LIFECYCLE, script);
+	const r = spawnSync(process.execPath, ["--no-warnings", full, ...args], {
+		stdio: "inherit", env: process.env,
+	});
+	if (r.status !== 0) process.exit(r.status ?? 1);
+}
+
+function status() {
+	const pdir = piDir();
+	console.log(`apple-pi lifecycle status`);
+	console.log(`  pi dir      : ${pdir}`);
+	console.log(`  metrics db  : ${dbPath()}`);
+	let db;
+	try { db = open("ro"); } catch {
+		console.log(`  db          : (not initialized — run 'apple-pi collect' first)`);
+		return;
+	}
+	try {
+		const runs = db.prepare("SELECT COUNT(*) c FROM runs").get().c;
+		const last = db.prepare("SELECT run_date FROM runs ORDER BY run_date DESC LIMIT 1").get();
+		const propPend = db.prepare("SELECT COUNT(*) c FROM proposals WHERE status='proposed'").get().c;
+		const propAll = db.prepare("SELECT COUNT(*) c FROM proposals").get().c;
+		console.log(`  runs        : ${runs} (last: ${last ? last.run_date : "—"})`);
+		console.log(`  proposals   : ${propAll} total, ${propPend} pending review`);
+		if (propPend > 0) console.log(`  ⚠ review pending: run 'apple-pi review' (then 'apple-pi apply --latest --yes')`);
+	} finally { db.close(); }
+	// schedule status
+	const r = spawnSync(SCHED, ["status"], { stdio: "inherit" });
+	if (r.status !== 0) console.log("  schedule    : (couldn't query — see schedule.sh status)");
+}
+
+function help() {
+	console.log(`apple-pi — autoresearch lifecycle CLI
+
+  collect [--date Y-M-D|--all]   daily metrics (the daily job runs this)
+  aggregate [--dry|--end Y-M-D]  weekly brief + proposal (the weekly job runs this)
+  review   [--latest]            show the latest proposal (read-only)
+  apply    [--latest] [--dry] [--yes]   apply the latest proposal (--yes writes)
+  reject   [--latest]            reject the latest proposal
+  status                        runs / proposals / schedule state
+  schedule install|status|remove|run-now   manage the daily+weekly jobs
+
+Daily collect + weekly aggregate are the only scheduled jobs. review/apply/reject
+are interactive — you drive them.`);
+}
+
+function main() {
+	const [cmd, ...rest] = process.argv.slice(2);
+	switch (cmd) {
+		case undefined:
+		case "-h":
+		case "--help":
+		case "help":
+			return help();
+		case "collect":    return nodeRun("collect-metrics.js", rest);
+		case "aggregate":  return nodeRun("aggregate-week.js", rest);
+		case "review":     return nodeRun("apply-update.js", ["review", ...rest]);
+		case "apply":      return nodeRun("apply-update.js", ["apply", ...rest]);
+		case "reject":     return nodeRun("apply-update.js", ["reject", ...rest]);
+		case "status":     return status();
+		case "schedule":   return spawnSync(SCHED, rest, { stdio: "inherit" }).status === 0 ? 0 : 1;
+		default:
+			console.error(`unknown command: ${cmd} (try 'apple-pi help')`);
+			process.exit(2);
+	}
+}
+
+process.exit(main() ?? 0);
