@@ -92,6 +92,17 @@
 	.ctas .ghost { background: var(--card); color: var(--text); border-color: var(--card-brd); }
 	.ctas .ghost:hover { background: var(--card-hov); }
 
+	/* ── hero pills (the four-word essence, inline) ─────────────────── */
+	.pillrow {
+		display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem;
+		margin: 1.6rem 0 0; padding: 0; list-style: none;
+	}
+	.pillrow .pill {
+		font-size: 0.8rem; letter-spacing: 0.01em; color: var(--gold-soft);
+		background: rgba(240,168,104,0.07); border: 1px solid rgba(240,168,104,0.2);
+		border-radius: 999px; padding: 0.28rem 0.8rem;
+	}
+
 	/* ── section scaffolding ───────────────────────────────────────── */
 	section { padding: 3rem 0; }
 	.eyebrow {
@@ -154,36 +165,6 @@
 		color: var(--green); background: rgba(127,209,161,0.07); border: 1px solid rgba(127,209,161,0.18);
 		border-radius: 5px; padding: 0.15rem 0.5rem;
 	}
-
-	/* ── vault hero (the key-safety spotlight) ─────────────────────── */
-	.vault-hero {
-		margin-top: 1.5rem; border-radius: 18px; padding: 1.8rem 1.8rem 1.5rem;
-		position: relative; overflow: hidden;
-		background:
-			linear-gradient(160deg, rgba(255,122,156,0.08), rgba(240,168,104,0.04) 60%, transparent),
-			var(--card);
-		border: 1px solid rgba(255,122,156,0.28);
-		box-shadow: 0 16px 48px -20px rgba(232,93,126,0.35);
-	}
-	.vault-hero::before {
-		content: "🔐"; position: absolute; top: -1.1rem; right: -0.4rem;
-		font-size: 7rem; opacity: 0.06; pointer-events: none; transform: rotate(12deg);
-	}
-	.vault-hero .lock { font-size: 1.6rem; line-height: 1; }
-	.vault-hero h3 {
-		margin: 0.5rem 0 0; font-size: clamp(1.3rem, 3vw, 1.7rem); font-weight: 700;
-		letter-spacing: -0.02em; color: var(--text); line-height: 1.2;
-	}
-	.vault-hero h3 .accent { color: var(--pink); }
-	.vault-hero .vh-sub { color: var(--muted); font-size: 1rem; margin: 0.6rem 0 1.2rem; max-width: 46rem; }
-	.vault-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.9rem; }
-	.vault-grid .v {
-		background: rgba(255,246,235,0.03); border: 1px solid var(--card-brd);
-		border-radius: 11px; padding: 0.9rem 1rem;
-	}
-	.vault-grid .v .k { font-size: 0.9rem; font-weight: 600; color: var(--gold); margin: 0 0 0.3rem; }
-	.vault-grid .v .d { margin: 0; font-size: 0.83rem; color: var(--muted); line-height: 1.5; }
-	.vault-hero .vh-foot { margin: 1.1rem 0 0; font-size: 0.8rem; color: var(--dim); line-height: 1.55; }
 
 	/* ── flow steps (onboarding lifecycle) ─────────────────────────── */
 	.flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.5rem; margin: 1.8rem 0 0.5rem; }
@@ -264,35 +245,17 @@
 			<a class="primary" href="https://github.com/jotokra/apple-pi">View on GitHub</a>
 			<a class="ghost" href="#how">See how it works</a>
 		</div>
+
+		<ul class="pillrow">
+			<li class="pill">self-tuning</li>
+			<li class="pill">self-improving</li>
+			<li class="pill">private</li>
+			<li class="pill">yours</li>
+		</ul>
 	</div>
 </header>
 
-<!-- ═══ THE THREE POWERS (immediate, scannable) ═══ -->
-<section style="padding-top:1rem;padding-bottom:0;">
-	<div class="wrap">
-		<div class="powers">
-			<div class="power">
-				<span class="pico">🎙️</span>
-				<h3>talks & listens</h3>
-				<p><code>/voice</code> flips your session into speech — on-device, private. Type <em>or</em> talk, same conversation.</p>
-			</div>
-			<div class="power">
-				<span class="pico">🌐</span>
-				<h3>acts on the web</h3>
-				<p>Searches, reads pages, and drives <em>your</em> headed Chrome — click, type, fill forms. You watch every move.</p>
-			</div>
-			<div class="power">
-				<span class="pico">🔐</span>
-				<h3>holds your keys safely</h3>
-				<p>An encrypted, trace-free vault. Onboarding proves your key works, then destroys it — only your config remains.</p>
-			</div>
-		</div>
-	</div>
-</section>
-
-<div class="wrap"><div class="divider"></div></div>
-
-<!-- ═══ THE PITCH ═══ -->
+<!-- ═══ 1 · THE HOOK: what no other agent does ═══ -->
 <section id="what">
 	<div class="wrap">
 		<p class="eyebrow">Why this, not another wrapper</p>
@@ -300,106 +263,63 @@
 		<p class="lead">apple-pi is a refined <strong>distribution</strong> of the open-source
 			<a href="https://pi.dev" style="color:var(--pink)">Pi Coding Agent</a> — the way a Linux distro wraps a kernel.
 			The engine is Pi's. apple-pi adds the three things that turn a model into an <em>agent you can trust</em>:</p>
-		<ul class="pitchpoints">
-			<li><strong>It proves its own setup.</strong> Onboarding makes one real call to confirm your key works, then <strong>destroys the key</strong>. No stale secrets left in a file.</li>
-			<li><strong>It tunes itself to your model</strong> — reads the provider catalog (context window, thinking format, cost) and rewrites its config to match. Switch models, re-tune.</li>
-			<li><strong>It improves itself, safely.</strong> A loop watches how you work, writes a weekly brief of concrete changes, and <strong>never applies one without your <code>yes</code></strong>.</li>
-		</ul>
+
+		<div class="pillars">
+			<div class="pillar">
+				<span class="ico">🎯</span>
+				<h3>It tunes itself to your model</h3>
+				<p>No one-size-fits-all defaults. apple-pi reads your model's <strong>real capabilities</strong> — context window, thinking format, cost — straight from the provider catalog and rewrites its config to match. Switch models, re-tune.</p>
+				<span class="tag">grounded in ground truth</span>
+			</div>
+			<div class="pillar">
+				<span class="ico">♻️</span>
+				<h3>It improves itself — safely</h3>
+				<p>A loop (inspired by Karpathy's <em>autoresearch</em>) records how you work and writes a weekly brief of concrete changes — but <strong>never applies one until you say yes.</strong> Self-improvement without the risk.</p>
+				<span class="tag">you gate every change</span>
+			</div>
+			<div class="pillar">
+				<span class="ico">🏠</span>
+				<h3>It's yours, and private</h3>
+				<p>Bring any OpenAI-/Anthropic-/Google-compatible model, including <strong>local</strong> (Ollama — no key, no cost). The shipped config holds <strong>zero</strong> of the author's personal data — a sanitization test enforces it.</p>
+				<span class="tag">no lock-in, no leaks</span>
+			</div>
+		</div>
 	</div>
 </section>
 
-<!-- ═══ SIX REASONS (3 capabilities + 3 differentiators) ═══ -->
-<section style="padding-top:1rem;">
-	<div class="wrap">
-		<p class="eyebrow">Why it's different</p>
-		<h2>Six things you don't usually get <span class="accent">in one install.</span></h2>
-		<div class="pillars">
+<div class="wrap"><div class="divider"></div></div>
 
+<!-- ═══ 2 · CAPABILITIES: a real agent, not a demo ═══ -->
+<section>
+	<div class="wrap">
+		<p class="eyebrow">And it's a real agent, not a demo</p>
+		<h2>Three things it can do <span class="accent">out of the box.</span></h2>
+		<div class="pillars">
 			<div class="pillar">
 				<span class="ico">🎙️</span>
 				<h3>Voice mode</h3>
 				<p>Type a prompt or <strong>speak it</strong> — same conversation. <code>/voice</code> flips the session to on-device speech (whisper.cpp + <code>say</code>); voice turns land right in the session tree.</p>
 				<span class="tag">type ⇄ talk</span>
 			</div>
-
 			<div class="pillar">
 				<span class="ico">🌐</span>
 				<h3>Web &amp; browser control</h3>
 				<p>Search the web, read pages, and drive <strong>your own headed Chrome</strong> — click, type, fill forms, screenshot. It confirms before anything irreversible.</p>
 				<span class="tag">sees &amp; acts</span>
 			</div>
-
 			<div class="pillar">
 				<span class="ico">🔐</span>
 				<h3>Credential vault</h3>
-				<p>An <strong>encrypted, trace-free</strong> key store. Onboarding makes one real call to prove your key works, then destroys it — only your tuned config remains.</p>
+				<p>An encrypted, trace-free key store. Onboarding proves your key works, then destroys it. Paste keys into a <strong>masked prompt</strong> — dots, not glyphs — that <strong>never reaches your input line, session log, or shell history.</strong></p>
 				<span class="tag">verified end-to-end</span>
 			</div>
-
-			<div class="pillar">
-				<span class="ico">🎯</span>
-				<h3>Tuned to your model</h3>
-				<p>No one-size-fits-all defaults. apple-pi reads your model's <strong>real capabilities</strong> — context window, thinking format, cost — from the provider catalog and retunes its config. Switch models, re-tune.</p>
-				<span class="tag">grounded in ground truth</span>
-			</div>
-
-			<div class="pillar">
-				<span class="ico">♻️</span>
-				<h3>Improves itself — safely</h3>
-				<p>A loop (inspired by Karpathy's <em>autoresearch</em>) records how you work, writes a weekly brief of concrete changes, and <strong>never applies one until you say yes</strong>.</p>
-				<span class="tag">you gate every change</span>
-			</div>
-
-			<div class="pillar">
-				<span class="ico">🏠</span>
-				<h3>Yours, not anyone's</h3>
-				<p>Bring any OpenAI-/Anthropic-/Google-compatible model, including <strong>local</strong> (Ollama — no key, no cost). The shipped config has <strong>zero</strong> of the author's personal data — a test enforces it.</p>
-				<span class="tag">no lock-in, no leaks</span>
-			</div>
-
 		</div>
 	</div>
 </section>
 
-<!-- ═══ THE CREDENTIAL VAULT (hero treatment) ═══ -->
-<section id="vault">
-	<div class="wrap">
-		<p class="eyebrow">Where your keys live</p>
-		<div class="vault-hero">
-			<span class="lock">🔐</span>
-			<h3>Your keys don't sit in a dotfile. <span class="accent">They don't leak — by design.</span></h3>
-			<p class="vh-sub">After install, every key you add lives in one encrypted vault, and the safe
-				path is the easy path: paste into a masked prompt that shows dots, not glyphs — it never
-				reaches your input line, your session log, or your shell history.</p>
-			<div class="vault-grid">
-				<div class="v">
-					<div class="k">trace-free entry</div>
-					<p class="d">A masked prompt shows dots as you type — shoulder-surf safe. No plaintext reaches
-						sessions, telemetry, logs, or history. Enforced + smoke-tested, not asserted.</p>
-				</div>
-				<div class="v">
-					<div class="k">encrypted at rest</div>
-					<p class="d">One file, locked with a passphrase you choose (<code>aes-256-cbc</code>, mode <code>0600</code>).
-						<code>/vault list</code> shows names; secrets never print without an explicit reveal.</p>
-				</div>
-				<div class="v">
-					<div class="k">you gate every reveal</div>
-					<p class="d">Nothing exports a secret unless you ask. Onboarding's key is marked temporary and pruned
-						the instant the connection is proven; keys you add yourself persist.</p>
-				</div>
-				<div class="v">
-					<div class="k">yours, anywhere</div>
-					<p class="d">Export into pi's auth, or pipe to your own manager (1Password CLI, <code>pass</code>) —
-						secret on <strong>stdin</strong>, metadata via env, never a command-line argument.</p>
-				</div>
-			</div>
-			<p class="vh-foot">Defense in depth against <em>accidental</em> leakage — not a sealed vault against a thief
-				with your laptop <em>and</em> passphrase. Turn on FileVault for the outer wall; the vault is the inner one.</p>
-		</div>
-	</div>
-</section>
+<div class="wrap"><div class="divider"></div></div>
 
-<!-- ═══ THE ONBOARDING LIFECYCLE ═══ -->
+<!-- ═══ 3 · HOW ONBOARDING WORKS ═══ -->
 <section id="how">
 	<div class="wrap">
 		<p class="eyebrow">How onboarding works</p>
@@ -429,120 +349,9 @@
 	</div>
 </section>
 
-<!-- ═══ WHY IT MATTERS (THE INNOVATION) ═══ -->
-<section>
-	<div class="wrap">
-		<p class="eyebrow">Why this matters</p>
-		<h2>The hard part of agents isn't the model — <span class="accent">it's everything around it.</span></h2>
-		<p class="lead">A frontier model with a leaky key file, a config that doesn't match it, and an improvement
-			loop that silently rewrites your settings is worse than useless. apple-pi makes opinionated,
-			<strong>provable</strong> choices on each — and that combination is the actual innovation:</p>
-
-		<div class="loop">
-			<div class="node">
-				<h4>Security as a first-class UX</h4>
-				<p>Not an afterthought config file. The transient-key lifecycle is the install flow itself.</p>
-			</div>
-			<div class="node">
-				<h4>Config grounded in ground truth</h4>
-				<p>The provider catalog, not vibes. Your settings reflect what your model can really do.</p>
-			</div>
-			<div class="node">
-				<h4>Methodology, not magic</h4>
-				<p>The persona encodes senior practice: spec before code, verify your own work, security review.</p>
-			</div>
-			<div class="node gate">
-				<h4>Human-gated self-improvement</h4>
-				<p>The agent improves — you stay in charge. Nothing writes itself without your <code>yes</code>.</p>
-			</div>
-		</div>
-	</div>
-</section>
-
-<!-- ═══ THE SELF-IMPROVEMENT LOOP ═══ -->
-<section>
-	<div class="wrap">
-		<p class="eyebrow">The self-improvement loop</p>
-		<h2>It watches how you work, <span class="accent">then asks before it changes anything.</span></h2>
-		<div class="loop">
-			<div class="node">
-				<h4>① collect (daily)</h4>
-				<p>Behavioral telemetry from your session logs → a local SQLite store. <strong>No LLM calls, zero quota burn.</strong></p>
-			</div>
-			<div class="node">
-				<h4>② brief (weekly)</h4>
-				<p>A diff vs. last week with concrete, reproducible change proposals — tool-use patterns, memory pressure, errors.</p>
-			</div>
-			<div class="node gate">
-				<h4>③ review → apply</h4>
-				<p><code>apple-pi review</code> shows the diff; <code>apply --latest --yes</code> writes it. <strong>You gate every change.</strong></p>
-			</div>
-		</div>
-	</div>
-</section>
-
-<!-- ═══ TYPE IT, OR TALK IT (VOICE) ═══ -->
-<section>
-	<div class="wrap">
-		<p class="eyebrow">Voice mode</p>
-		<h2>Type it, <span class="accent">or talk it.</span> Same conversation.</h2>
-		<p style="color:var(--muted);max-width:46rem;">Type in the pi TUI, then <code>/voice</code> (or Ctrl+V) flips the session into <strong>pivoice</strong> — on-device speech-to-text (whisper.cpp) and text-to-speech (<code>say</code>). Your voice turns append to the same JSONL; <code>pi -c</code> brings them back into the tree. One conversation, two ways in.</p>
-	</div>
-</section>
-
 <div class="wrap"><div class="divider"></div></div>
 
-<!-- ═══ ACTS ON THE LIVE WEB ═══ -->
-<section>
-	<div class="wrap">
-		<p class="eyebrow">Beyond the filesystem</p>
-		<h2>The agent can <span class="accent">see and act on the live web.</span></h2>
-		<p style="color:var(--muted);max-width:46rem;">A bundled web extension — on by default — turns “use the best viable way” outward: search the web,
-			read pages, and drive <strong>your own persistent, headed Chrome</strong> so you watch every click. Logins survive between runs.</p>
-		<div class="loop">
-			<div class="node">
-				<h4>web_search</h4>
-				<p>Ranked results (title / url / snippet). DuckDuckGo free; Tavily / Brave via key.</p>
-			</div>
-			<div class="node">
-				<h4>web_fetch</h4>
-				<p>URL &rarr; cleaned markdown. Renders JavaScript-heavy SPAs through the browser on demand.</p>
-			</div>
-			<div class="node">
-				<h4>browser_*</h4>
-				<p>Snapshot &rarr; click / type / check by ref, screenshot, tabs. The agent confirms before any payment or deletion.</p>
-			</div>
-		</div>
-	</div>
-</section>
-
-<div class="wrap"><div class="divider"></div></div>
-
-<!-- ═══ TWO CHANNELS OF IMPROVEMENT ═══ -->
-<section>
-	<div class="wrap">
-		<p class="eyebrow">Two channels, kept distinct</p>
-		<h2>Know what's <span class="accent">your behavior adapting</span> vs <span class="accent">new code arriving.</span></h2>
-		<div class="loop">
-			<div class="node">
-				<h4>self-improvement</h4>
-				<p>Proposals derived from <em>your</em> session telemetry — tool-discipline drift, compaction pressure, error rates. Tagged <code>source: autoresearch</code>. You <code>review</code> then <code>apply --yes</code>.</p>
-			</div>
-			<div class="node">
-				<h4>release updates</h4>
-				<p>New apple-pi / pivoice versions from GitHub. <code>update --check</code> is read-only; folded into the weekly brief too. Tagged <code>source: release</code>. <strong>Never auto-installs.</strong></p>
-			</div>
-			<div class="node gate">
-				<h4>you gate both</h4>
-				<p>Nothing writes itself. The brief proposes; you read the diff and say yes — for config <em>and</em> for code.</p>
-			</div>
-		</div>
-	</div>
-</section>
-
-<div class="wrap"><div class="divider"></div></div>
-
-<!-- ═══ IN THE BOX ═══ -->
+<!-- ═══ 4 · IN THE BOX ═══ -->
 <section>
 	<div class="wrap">
 		<p class="eyebrow">In the box</p>
@@ -583,24 +392,9 @@
 					<li>kanban · telegram</li>
 				</ul>
 			</div>
-			<div class="item">
-				<h3>The credential vault</h3>
-				<p>Keys don't sit in <code>.zshrc</code> or <code>.env</code> — they sit in one encrypted file, and the
-					safe path is the easy path:</p>
-				<ul>
-					<li><strong>trace-free entry</strong> — paste into a masked prompt; it never reaches your input line, your session log, or your shell history</li>
-					<li><strong>encrypted at rest</strong> — one file, locked with a passphrase you choose (<code>0600</code>)</li>
-					<li><strong>you gate every reveal</strong> — <code>/vault list</code> shows names, not secrets</li>
-					<li><strong>onboarding cleans up</strong> — the install key is marked temporary and pruned the moment the connection is proven; keys you add yourself stay</li>
-				</ul>
-				<p style="margin-top:0.5rem;color:var(--muted);">Defense in depth against accidental leakage — not a sealed vault against a thief
-					with your laptop <em>and</em> passphrase. Turn on FileVault for the outer wall.</p>
-			</div>
 		</div>
 	</div>
 </section>
-
-<div class="wrap"><div class="divider"></div></div>
 
 <footer>
 	<p>apple-pi is MIT-licensed and builds on the open-source <a href="https://pi.dev">Pi Coding Agent</a>.<br>
