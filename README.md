@@ -111,8 +111,7 @@ the prompts, and `/skill:self-assess` to re-tune when your stack changes.
 
 | Flag | Effect |
 |---|---|
-| `--purge-auth-too` | Also delete `auth.json` at purge (re-authorise via `/login` after). |
-| `--purge-config` | Also delete the onboarding `settings.json` (P3 rebuilds from scratch). |
+| `--purge-auth-too` | Also delete `auth.json` at purge (re-authorise via `/login` after). Off by default — you need runtime auth. |
 | `--sandbox <dir>` | Use `<dir>` as the Pi config dir (testing; never touches `~/.pi`). |
 | `--skip-confirm` | Skip the live model-confirm call (air-gapped / OAuth flows). |
 | `--no-handoff` | Stop after P1+purge; print the handoff command. |

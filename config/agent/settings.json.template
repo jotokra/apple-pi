@@ -1,9 +1,10 @@
 {
-  "_comment": "apple-pi global config. The onboarding wizard fills in the model fields and resolves the sysinfo-guard extension path. Onboarding's self-improvement phase (P3) then retunes thinking levels, compaction reserve, and favourites to the confirmed model's REAL capabilities. See .docs/PLAN.md.",
+  "_applepi_seed": true,
+  "_comment": "INTERNAL ONBOARDING SCAFFOLDING — apple-pi writes this during P1. It is NOT the user's config. P3 (self-improvement) rewrites this file into a clean, model-tuned user config and REMOVES this marker + every _comment/_*_comment field. After P3, this file should read like the user wrote it for their model, with zero apple-pi scaffolding left. See .docs/PLAN.md D1.",
   "defaultProvider": "__APPLEPI_PROVIDER__",
   "defaultModel": "__APPLEPI_MODEL__",
   "defaultThinkingLevel": "high",
-  "_thinking_comment": "Placeholder. P3 (self-improvement) reads the model's thinkingLevelMap from the pi-ai catalog and rewrites this to the model's real top tier (e.g. 'xhigh' for effort-based models, or a budget-appropriate level for token-budget models). Do not hand-tune before P3 has run.",
+  "_thinking_comment": "SEED PLACEHOLDER. P3 reads the model's thinkingLevelMap from the pi-ai catalog and rewrites this to the model's real top tier; this comment is removed.",
   "hideThinkingBlock": false,
   "theme": "dark",
   "quietStartup": false,
@@ -14,7 +15,6 @@
   "editorPaddingX": 1,
   "autocompleteMaxVisible": 8,
   "_models": {
-    "_comment": "Ctrl+P favourites. Populated by P3 from runnable, keyed models only. Empty until the model is confirmed and scanned.",
     "favorites": [
       "__APPLEPI_PROVIDER__/__APPLEPI_MODEL__"
     ]
@@ -22,13 +22,11 @@
   "compaction": {
     "enabled": true,
     "reserveTokens": 16384,
-    "_reserve_comment": "P3 scales this to the confirmed model's context window (e.g. larger reserve for 1M-context models).",
     "keepRecentTokens": 64000
   },
   "extensions": [
     "__APPLEPI_EXT_SYSINFO__"
   ],
-  "_extensions_comment": "Only sysinfo-guard (the red/blue default) is enabled at bootstrap. n8n/forgejo/netbird/llm/kanban/telegram are added here on demand by the workflow-offer phase or by hand, after their env vars are set.",
   "skills": [
     "__APPLEPI_SKILLS_DIR__"
   ],
@@ -39,7 +37,6 @@
   "shellPath": "__APPLEPI_SHELL__",
   "sessionDir": "__APPLEPI_SESSIONS_DIR__",
   "tools": {
-    "_comment": "Built-in tool allowlist. Extension tools (n8n_*, forgejo_*, netbird_*, llm_*, kanban_*, telegram_*) are registered by their extension files when enabled.",
     "allow": ["read", "write", "edit", "bash", "grep", "find", "ls"]
   }
 }

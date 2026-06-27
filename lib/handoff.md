@@ -64,11 +64,30 @@ This is the core of "tune yourself to my model." Run it properly.
    - Remove any dead config (knobs the model's code path never reads).
    Verify each change before applying (the skill's verify-don't-assume
    rule). Expect to invalidate a hypothesis or two.
-4. **Write the audit trail** to `~/.pi/agent/self-assessment-<date>.md`
+4. **Rewrite settings.json into the USER'S CLEAN CONFIG.** This is
+   non-negotiable and is the second half of decision D1. The seed file you
+   were handed is INTERNAL apple-pi scaffolding (it carries
+   `"_applepi_seed": true` and was full of `_comment`/`_*_comment` fields).
+   The user must be left with a config that reads like THEY wrote it for
+   their model — not an apple-pi artifact. Concretely, when P3 is done:
+   - **Remove `"_applepi_seed"`** entirely.
+   - **Remove every `_comment` / `_*_comment` / `_thinking_comment` field**
+     (Pi ignores `_`-prefixed keys, so they're noise the user shouldn't
+     inherit). If a tuned value needs explaining, put it in the
+     self-assessment doc, not in the config.
+   - Keep only real Pi keys, tuned to the model.
+   The result is the user's own config, living alongside `auth.json`. After
+   this step, nothing in `~/.pi/agent/settings.json` should betray that
+   apple-pi wrote it.
+5. **Write the audit trail** to `~/.pi/agent/self-assessment-<date>.md`
    (findings `F1..`, invalidated hypotheses kept, `NF` for unverifiable
    claims, what was deliberately NOT changed and why).
-5. Run `bash <repo>/smoke/run.sh` if present; fix any count-tripwire your
+6. Run `bash <repo>/smoke/run.sh` if present; fix any count-tripwire your
    changes trip (in lockstep — that's the skill's own lesson).
+7. **Verify the config is clean** before announcing P4: grep
+   `~/.pi/agent/settings.json` for `_applepi_seed` and `_comment` — both
+   must return nothing. If they don't, you're handing the user scaffolding,
+   not their config; finish the rewrite.
 
 ## P4 — Integrated
 
