@@ -43,6 +43,19 @@ async function launchVoice(ctx: ExtensionContext): Promise<void> {
 		return;
 	}
 
+	// Dep guard: if the whisper model is missing, voice won't transcribe.
+	// Run the read-only check and, if anything's missing, point the user at the
+	// one-command enable script instead of launching a dead pivoice.
+	const modelPath = join(homedir(), ".pi", "voice", "models", "ggml-small.en.bin");
+	const enableScript = join(homedir(), ".apple-pi", "lifecycle", "voice-enable.sh");
+	if (!existsSync(modelPath)) {
+		const msg = existsSync(enableScript)
+			? `Voice deps not installed (no whisper model). Enable with one command:\n  bash ${enableScript}\nThen /voice again.`
+			: `Voice deps not installed (no whisper model at ${modelPath}). See config/voice/README.md.`;
+		await ctx.ui.notify(msg, "warning");
+		return;
+	}
+
 	const target = sessionFile ?? "(continue most recent)";
 	const confirm = await ctx.ui.confirm(
 		"Enter voice mode?",

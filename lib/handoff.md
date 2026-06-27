@@ -98,6 +98,19 @@ Announce, briefly and concretely:
 - That you're ready to work, and that re-running `self-assess` later keeps
   the config honest as the stack changes.
 
+You also have three **default-on** capabilities (no setup needed):
+
+- **Voice mode** — `/voice` (or Ctrl+V) flips the session into pivoice
+  (on-device whisper.cpp + `say`). Same conversation: voice turns append to
+  the session JSONL, `pi -c` resumes. *If onboarding didn't enable voice*
+  (user declined the model download), tell them the one command to enable
+  it later: `bash <repo>/lifecycle/voice-enable.sh`.
+- **Web + browser control** — `web_search`, `web_fetch`, and `browser_*`
+  (drive their persistent, headed Chrome). Confirm before any irreversible
+  web action.
+- **Credential vault** — `/vault` for any key/secret the user hands you
+  (see the Credentials rule).
+
 Do not over-celebrate. One tight summary.
 
 ## P5 — Offer ONE workflow
