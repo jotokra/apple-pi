@@ -13,6 +13,9 @@
  *   /vault get <id>             privileged reveal — confirm-gated (REQ-CV-5)
  *   /vault lock                 flush the cached passphrase (re-prompt next use)
  *   /vault prune-transient      reap stale onboarding entries (R6)
+ *   /vault rotate <id>          replace an existing entry's secret (re-encrypts)
+ *   /vault import <file>        bulk-load entries from JSON, then shred source
+ *   /vault export <id> [--provider P]  write the secret into auth.json (api_key shape)
  *
  * Entry-path security (see .docs/features/credential-vault/SECURITY.md):
  *   v1 uses ctx.ui.input (a UI dialog, separate from the typed input line) +
@@ -197,6 +200,69 @@ async function cmdPruneTransient(ctx: ExtensionCommandContext, core: any): Promi
 	}
 }
 
+async function cmdRotate(ctx: ExtensionCommandContext, core: any, args: string): Promise<void> {
+	const { positional } = parseArgs(args);
+	const id = positional[0] || (await ctx.ui.input("Entry id to rotate"));
+	if (!id) { ctx.ui.notify("vault rotate: no id", "warning"); return; }
+	// rotate implies the entry exists; refuse early before prompting for a secret.
+	let exists: any;
+	try { exists = core.getEntry(cachedPass!, id); }
+	catch (e: any) { ctx.ui.notify(`vault rotate failed: ${e?.message || String(e)}`, "error"); return; }
+	if (!exists) { ctx.ui.notify(`vault rotate: no entry "${id}" (use /vault add to create)`, "warning"); return; }
+	const confirmRotate = await ctx.ui.confirm("Rotate secret?", `Replace the secret for "${id}" with a new one?`);
+	if (!confirmRotate) return;
+	const secret = await ctx.ui.input(`Paste the NEW secret for "${id}" (it will not be shown)`);
+	try { (ctx.ui as any).setEditorText?.(""); } catch { /* not all contexts */ }
+	if (!secret) { ctx.ui.notify("vault rotate: no secret entered — nothing changed", "warning"); return; }
+	try {
+		const r = core.rotateEntry(cachedPass!, { id, secret });
+		ctx.ui.notify(r.rotated ? `vault: rotated "${id}"` : `vault: could not rotate "${id}"`, r.rotated ? "info" : "warning");
+	} catch (e: any) {
+		ctx.ui.notify(`vault rotate failed: ${e?.message || String(e)}`, "error");
+	}
+}
+
+async function cmdImport(ctx: ExtensionCommandContext, core: any, args: string): Promise<void> {
+	const { positional } = parseArgs(args);
+	const file = positional[0] || (await ctx.ui.input("Path to JSON file to import"));
+	if (!file) { ctx.ui.notify("vault import: no file", "warning"); return; }
+	const ok = await ctx.ui.confirm(
+		"Import + shred source?",
+		`Read entries from "${file}", add them to the vault, then securely delete the source file?`,
+	);
+	if (!ok) return;
+	try {
+		const entries = core.parseImportFile(file);
+		const r = core.importEntries(cachedPass!, entries);
+		const shredded = core.shredFile(file);
+		ctx.ui.notify(
+			`vault: imported ${r.imported}${r.errors.length ? ` (${r.errors.length} errors)` : ""}${shredded ? "; source shredded" : "; could not shred source"}`,
+			"info",
+		);
+	} catch (e: any) {
+		ctx.ui.notify(`vault import failed: ${e?.message || String(e)}`, "error");
+	}
+}
+
+async function cmdExport(ctx: ExtensionCommandContext, core: any, args: string): Promise<void> {
+	const { positional, flags } = parseArgs(args);
+	const id = positional[0] || (await ctx.ui.input("Entry id to export"));
+	if (!id) { ctx.ui.notify("vault export: no id", "warning"); return; }
+	const provider = flags.provider;
+	const ok = await ctx.ui.confirm(
+		"Write to auth.json?",
+		`Write the secret for "${id}" into auth.json under "${provider || id}"? (pi's native auth store; other providers are preserved.)`,
+	);
+	if (!ok) return;
+	try {
+		const r = core.exportToAuth(cachedPass!, id, { provider });
+		if (!r.wrote) { ctx.ui.notify(`vault export: ${r.reason}`, "warning"); return; }
+		ctx.ui.notify(`vault: exported "${id}" → auth.json["${r.provider}"]`, "info");
+	} catch (e: any) {
+		ctx.ui.notify(`vault export failed: ${e?.message || String(e)}`, "error");
+	}
+}
+
 function cmdLock(ctx: ExtensionCommandContext): void {
 	cachedPass = null;
 	ctx.ui.notify("vault: passphrase forgotten — re-prompt next /vault use", "info");
@@ -204,9 +270,9 @@ function cmdLock(ctx: ExtensionCommandContext): void {
 
 // ── registration ──────────────────────────────────────────────────────
 export default function credentialVaultExtension(pi: ExtensionAPI): void {
-	const SUBS = ["add", "list", "get", "remove", "lock", "prune-transient"];
+	const SUBS = ["add", "list", "get", "remove", "rotate", "import", "export", "lock", "prune-transient"];
 	pi.registerCommand("vault", {
-		description: "Encrypted credential vault (add/list/get/remove/lock)",
+		description: "Encrypted credential vault (add/list/get/remove/rotate/import/export/lock)",
 		getArgumentCompletions: (prefix) => {
 			const hits = SUBS.filter((s) => s.startsWith(prefix));
 			return hits.length ? hits.map((s) => ({ value: s, label: s })) : null;
@@ -234,10 +300,13 @@ export default function credentialVaultExtension(pi: ExtensionAPI): void {
 				case "list":             return cmdList(ctx, core);
 				case "get":              return cmdGet(ctx, core, rest);
 				case "remove":           return cmdRemove(ctx, core, rest);
+				case "rotate":           return cmdRotate(ctx, core, rest);
+				case "import":           return cmdImport(ctx, core, rest);
+				case "export":           return cmdExport(ctx, core, rest);
 				case "prune-transient":  return cmdPruneTransient(ctx, core);
 				case "lock":             return cmdLock(ctx); return;
 				default:
-					ctx.ui.notify(`vault: unknown subcommand "${sub}" — try add/list/get/remove/lock`, "warning");
+					ctx.ui.notify(`vault: unknown subcommand "${sub}" — try add/list/get/remove/rotate/import/export/lock`, "warning");
 			}
 		},
 	});

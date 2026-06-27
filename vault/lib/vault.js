@@ -253,12 +253,146 @@ function looksLikeSecret(s) {
 	return /^[A-Za-z0-9_\-]{20,}$/.test(s);
 }
 
+// ── rotate / import / export (REQ-CV-1 remainder; cv-rotate-import-export) ──
+//
+// rotate: replace an existing entry's secret (re-encrypted under a fresh
+// salt via the same write path). Refuses if the entry does not exist —
+// "rotate" implies the credential is already stored; `add` creates.
+function rotateEntry(passphrase, { id, secret, note }) {
+	if (!id) throw new Error("vault: rotateEntry requires an id");
+	if (typeof secret !== "string") throw new Error("vault: rotateEntry requires a string secret");
+	let rotated = false;
+	modifyVault(passphrase, (env) => {
+		const existing = findEntry(env, id);
+		if (!existing) return; // not found → rotated stays false
+		rotated = true;
+		const entry = {
+			...existing, // preserve id/kind/provider/createdAt/lifetime/unknown fields
+			secret,
+			note: note !== undefined ? note : existing.note,
+			updatedAt: new Date().toISOString(),
+		};
+		env.entries = env.entries.filter((e) => e.id !== id).concat(entry);
+	});
+	return { rotated };
+}
+
+// parseImportFile: read + JSON.parse a migration file into an entries array.
+// Accepts the two natural shapes:
+//   - { entries: [ ... ] }   (the vault's own envelope shape)
+//   - [ ... ]                (a bare array of entry objects)
+// Throws on unreadable / unparseable / unknown shape. Does NOT accept pi's
+// auth.json shape ({provider:{type,key}}) — that reverse bridge is out of
+// scope for this card (export goes vault→auth.json; the reverse is a later
+// convenience). Each entry is validated by importEntries.
+function parseImportFile(filePath) {
+	const raw = fs.readFileSync(filePath, "utf8");
+	const data = JSON.parse(raw);
+	let entries;
+	if (Array.isArray(data)) entries = data;
+	else if (data && Array.isArray(data.entries)) entries = data.entries;
+	else throw new Error("import file must be a JSON array or { entries: [...] }");
+	return entries;
+}
+
+// importEntries: bulk add. Each entry needs at least { id, secret }.
+// addEntry semantics (overwrites a same-id entry). One bad entry does not
+// abort the batch — it's recorded in errors[]. Returns { imported, errors }.
+function importEntries(passphrase, entries) {
+	if (!Array.isArray(entries)) throw new Error("vault: importEntries requires an array");
+	let imported = 0;
+	const errors = [];
+	for (const e of entries) {
+		try {
+			if (!e || typeof e !== "object") throw new Error("entry is not an object");
+			if (!e.id) throw new Error("missing id");
+			if (typeof e.secret !== "string") throw new Error("missing or non-string secret");
+			addEntry(passphrase, {
+				id: e.id, secret: e.secret,
+				kind: e.kind || "api_key",
+				provider: e.provider || e.id,
+				note: e.note || "",
+				lifetime: e.lifetime === "transient" ? "transient" : "persistent",
+			});
+			imported++;
+		} catch (err) {
+			errors.push({ id: (e && e.id) || "?", error: err.message });
+		}
+	}
+	return { imported, errors };
+}
+
+// shredFile: best-effort secure delete (overwrite with zeros + fsync + unlink).
+// HONEST CAVEAT: on SSDs / APFS copy-on-write, wear-leveling means this is NOT
+// a forensic guarantee — remnants may persist. The goal is "don't leave the
+// plaintext source lying around after import", not "defeat disk recovery".
+// Real at-rest protection is FileVault (recommended in SECURITY.md A4), not
+// shred. Returns true if the file was removed.
+function shredFile(filePath) {
+	let st;
+	try { st = fs.lstatSync(filePath); }
+	catch { return false; }
+	// Refuse to follow a symlink: openSync("r+") + writeSync would overwrite the
+	// TARGET, while unlinkSync removes only the link itself — silent data loss
+	// of an unrelated file. Return false so the caller tells the user to remove
+	// it manually. (Reads via parseImportFile still follow the link, which is
+	// fine; it's only the destructive shred that must not.)
+	if (st.isSymbolicLink()) return false;
+	try {
+		const sz = st.size;
+		if (sz > 0) {
+			const h = fs.openSync(filePath, "r+");
+			fs.writeSync(h, Buffer.alloc(sz, 0), 0, sz, 0);
+			fs.fsyncSync(h);
+			fs.closeSync(h);
+		}
+	} catch { /* best-effort; fall through to unlink */ }
+	try { fs.unlinkSync(filePath); return true; }
+	catch { return false; }
+}
+
+// exportToAuth: the vault → auth.json bridge (SPEC §D). Writes the entry's
+// secret into ~/.pi/agent/auth.json under `provider` (default: entry.provider,
+// then id) in pi's native { type:"api_key", key } shape. Merges with the
+// existing auth.json (other providers preserved). REFUSES to clobber an
+// existing provider entry that is not api_key-shaped (e.g. an OAuth token) —
+// returns { wrote:false, reason } so the caller surfaces it. Atomic write at
+// 0600. The secret transits memory → auth.json only; it is never echoed.
+function authJsonPath() {
+	return `${piDir()}/agent/auth.json`;
+}
+function exportToAuth(passphrase, id, opts = {}) {
+	const entry = getEntry(passphrase, id);
+	if (!entry) return { wrote: false, reason: `no entry '${id}'` };
+	const provider = opts.provider || entry.provider || id;
+	let auth = {};
+	try { auth = JSON.parse(fs.readFileSync(authJsonPath(), "utf8")); }
+	catch { /* missing or invalid → start fresh */ }
+	if (!auth || typeof auth !== "object" || Array.isArray(auth)) auth = {};
+	const existing = auth[provider];
+	if (existing && (typeof existing !== "object" || existing.type !== "api_key")) {
+		return { wrote: false, reason: `auth.json['${provider}'] is not api_key-shaped (refusing to clobber an OAuth/other token)` };
+	}
+	auth[provider] = { type: "api_key", key: entry.secret };
+	const p = authJsonPath();
+	fs.mkdirSync(path.dirname(p), { recursive: true });
+	const tmp = `${p}.tmp.${process.pid}`;
+	const h = fs.openSync(tmp, "w", 0o600);
+	fs.writeSync(h, JSON.stringify(auth, null, 2));
+	fs.fsyncSync(h);
+	fs.closeSync(h);
+	fs.renameSync(tmp, p);
+	fs.chmodSync(p, 0o600); // belt + suspenders (rename may relax perms)
+	return { wrote: true, provider };
+}
+
 module.exports = {
 	VAULT_VERSION,
 	TRANSIENT_MAX_AGE_MS,
-	vaultPath, piDir,
+	vaultPath, piDir, authJsonPath,
 	readVault, writeVault, ensureVault, modifyVault,
-	addEntry, listEntries, getEntry, removeEntry, pruneTransient,
+	addEntry, rotateEntry, listEntries, getEntry, removeEntry, pruneTransient,
+	importEntries, parseImportFile, shredFile, exportToAuth,
 	looksLikeSecret,
 	// exported for testing only (NOT for echoing secrets):
 	_findEntryForTest: findEntry,
