@@ -131,3 +131,36 @@ Re-read conclusion (R1–R8): every original failure mode is still mitigated or
 explicitly accepted; the three new subcommands introduce no new crypto, no new
 leak surface (export's plaintext hop is to pi's existing store, by design),
 and one new footgun (symlink shred) that is guarded. Gate item satisfied.
+
+---
+
+## Red/blue pass — 2026-06-28 (post-merge hardening)
+
+**Threat model (1-paragraph):** this code stores API keys encrypted at rest
+(aes-256-cbc, pbkdf2 600k iters) in a 0600 file, protects the passphrase by
+passing it to openssl on stdin (never argv), serializes writes under an
+O_EXCL+PID-staleness file lock, and trusts the operator for command strings
+(`vault.exportCmd`) with the secret on stdin only. Two holes found by
+adversarial review, both fixed + tripwired:
+
+- **B1 (BLOCKER, fixed) — corrupt auth.json → silent data loss.**
+  `exportToAuth` caught *any* read/parse failure of `auth.json` and "started
+  fresh", writing only the one exported provider. A transiently-corrupt file
+  (concurrent write, disk error, half-written by another process) would
+  **destroy every other provider's credential** with `wrote:true` reported.
+  PoC confirmed. **Fix:** fail closed — ENOENT (missing) starts fresh
+  legitimately; any other error refuses with a clear message and leaves the
+  file untouched.
+- **W1 (WARNING, fixed) — predictable temp path + symlink plant.**
+  `_writeVaultUnlocked` and `exportToAuth` created `${path}.tmp.${pid}` with
+  `openSync("w")` (follows symlinks). A local attacker who can write to
+  `~/.pi/agent/` plants a symlink at the predicted temp path; the next vault
+  write redirects ciphertext into the symlink TARGET, corrupting an unrelated
+  file. PoC confirmed (victim file overwritten with ciphertext). **Fix:**
+  `openSync(tmp, "wx", 0o600)` (O_EXCL) — refuses if the path exists,
+  including a planted symlink. Same trust boundary as the rest of `~/.pi`,
+  but the hole is now closed.
+
+Both are pinned by `smoke/vault-failclosed.sh` (added to `run.sh`), so a
+future refactor that reverts either fix trips the gate. Re-read conclusion:
+R1–R8 unchanged and still satisfied; the two new findings are closed.
