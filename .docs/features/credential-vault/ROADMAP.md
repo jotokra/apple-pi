@@ -1,7 +1,7 @@
 ---
 id: feat-credential-vault
 title: "Credential Vault — reusable, encrypted, trace-free secret store"
-status: triage
+status: review
 parent: root
 depends_on: []
 blocks: []
@@ -33,12 +33,15 @@ pi TUI. Spec: `SPEC.md`. Security model: `SECURITY.md`. User concept:
 
 ## Acceptance (gate to merge)
 
-- [ ] `smoke/vault-roundtrip.sh` green (V-1)
-- [ ] `smoke/vault-tracefree.sh` green — **zero** marker hits (V-2, REQ-CV-7)
-- [ ] `smoke/vault-onboarding.sh` green — transient pruned, persistent survives (V-3)
-- [ ] `smoke/sanitize.sh` + `smoke/structure.sh` green; `*.vault` gitignored (V-4)
-- [ ] `SECURITY.md` red-team R1–R7 each re-read and either mitigated or explicitly accepted
-- [ ] `CONCEPT.md` text mirrored into README "Credential Vault" section
+- [x] `smoke/vault-roundtrip.sh` green (V-1)
+- [x] `smoke/vault-tracefree.sh` green — **zero** marker hits (V-2, REQ-CV-7)
+- [x] `smoke/vault-onboarding.sh` green — transient pruned, persistent survives (V-3)
+- [x] `smoke/sanitize.sh` + `smoke/structure.sh` green; `*.vault` gitignored (V-4)
+- [x] `SECURITY.md` red-team R1–R8 each re-read and either mitigated or explicitly accepted (incl. the rotate/import/export addendum)
+- [x] `CONCEPT.md` text mirrored into README "Credential Vault" section
+
+All six child cards committed on `feat/credential-vault`; all 8 smokes green.
+Ready to PR to `main`.
 
 ## Out of scope (separate cards, later)
 

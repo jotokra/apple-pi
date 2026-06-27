@@ -44,6 +44,8 @@ done. Encrypted at rest, never echoed, never logged.
 /vault remove <name>     delete one key
 /vault get <name>        reveal a key  (opt-in; warned)
 /vault rotate <name>     replace a key with a new one
+/vault import <file>     bulk-load keys from JSON, then shred the source
+/vault export <name>     write a key into auth.json (pi's native auth store)
 /vault lock              forget the passphrase until next use
 ```
 
