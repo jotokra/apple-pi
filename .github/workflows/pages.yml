@@ -1,4 +1,9 @@
-# Publish docs/ to GitHub Pages on every push to main.
+# Publish the site to GitHub Pages on every push to main.
+#
+# The site has two parts, assembled into one Pages artifact:
+#   /            ← the hand-crafted marketing landing (docs/index.html)
+#   /guide/      ← the rendered docs site (VitePress, built from guide/)
+#
 # Repo setting required: Settings → Pages → Source = "GitHub Actions".
 name: pages
 
@@ -7,6 +12,9 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'guide/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -24,10 +32,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Upload docs/ as Pages artifact
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install docs deps
+        run: npm ci
+      - name: Build the guide (VitePress)
+        run: npm run docs:build
+      - name: Assemble Pages artifact (landing at root, guide at /guide/)
+        run: |
+          set -euo pipefail
+          mkdir _site
+          # Marketing landing → site root. docs/index.html is self-contained
+          # (inline CSS/JS; no sibling assets), so a single copy suffices.
+          cp docs/index.html _site/index.html
+          # Rendered guide → /guide/. VitePress base is /apple-pi/guide/.
+          mkdir _site/guide
+          cp -r guide/.vitepress/dist/. _site/guide/
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: _site
   deploy:
     needs: build
     runs-on: ubuntu-latest
