@@ -133,7 +133,7 @@ function _writeVaultUnlocked(env, passphrase) {
 	fs.mkdirSync(dir, { recursive: true });
 	const tmp = `${vp}.tmp.${process.pid}`;
 	const ciphertext = encrypt(Buffer.from(JSON.stringify(env, null, 2), "utf8"), passphrase);
-	const h = fs.openSync(tmp, "w", 0o600);
+	const h = fs.openSync(tmp, "wx", 0o600);  // O_EXCL: refuse if path exists (stale temp OR symlink-plant attack)
 	fs.writeSync(h, ciphertext);
 	fs.fsyncSync(h); // R5: durability before the rename
 	fs.closeSync(h);
@@ -366,18 +366,36 @@ function exportToAuth(passphrase, id, opts = {}) {
 	if (!entry) return { wrote: false, reason: `no entry '${id}'` };
 	const provider = opts.provider || entry.provider || id;
 	let auth = {};
-	try { auth = JSON.parse(fs.readFileSync(authJsonPath(), "utf8")); }
-	catch { /* missing or invalid → start fresh */ }
-	if (!auth || typeof auth !== "object" || Array.isArray(auth)) auth = {};
+	const ap = authJsonPath();
+	let existed = false;
+	try {
+		const raw = fs.readFileSync(ap, "utf8");
+		existed = true;
+		auth = JSON.parse(raw);
+	} catch (e) {
+		if (e.code === "ENOENT") {
+			/* missing → start fresh (legitimate first export) */
+		} else {
+			// FAIL CLOSED: a corrupt/unreadable auth.json is NOT a reason to
+			// silently start fresh — that would destroy every other provider's
+			// credential. Surface it; the user decides (restore from backup,
+			// fix the JSON, or explicitly remove it).
+			return { wrote: false, reason: `auth.json exists but is unreadable (${e.message}); refusing to overwrite — other providers would be lost. Restore or fix it first.` };
+		}
+	}
+	if (!auth || typeof auth !== "object" || Array.isArray(auth)) {
+		if (existed) return { wrote: false, reason: "auth.json exists but did not parse to an object; refusing to overwrite." };
+		auth = {};
+	}
 	const existing = auth[provider];
 	if (existing && (typeof existing !== "object" || existing.type !== "api_key")) {
 		return { wrote: false, reason: `auth.json['${provider}'] is not api_key-shaped (refusing to clobber an OAuth/other token)` };
 	}
 	auth[provider] = { type: "api_key", key: entry.secret };
-	const p = authJsonPath();
+	const p = ap;
 	fs.mkdirSync(path.dirname(p), { recursive: true });
 	const tmp = `${p}.tmp.${process.pid}`;
-	const h = fs.openSync(tmp, "w", 0o600);
+	const h = fs.openSync(tmp, "wx", 0o600);  // O_EXCL: defeat symlink-plant on this predictable path
 	fs.writeSync(h, JSON.stringify(auth, null, 2));
 	fs.fsyncSync(h);
 	fs.closeSync(h);
