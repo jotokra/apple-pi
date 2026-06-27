@@ -14,6 +14,7 @@ for f in install.sh README.md LICENSE .gitignore .docs/PLAN.md \
 		lib/_common.sh lib/handoff.md \
 		lifecycle/collect-metrics.js lifecycle/aggregate-week.js lifecycle/apply-update.js \
 		lifecycle/lib/db.js lifecycle/lib/brief.js lifecycle/schema.sql lifecycle/schedule.sh \
+		vault/lib/vault.js vault/cli.js \
 		bin/apple-pi docs/index.html PUBLISHING.md; do
 	[[ -f "$f" ]] || { fail "missing $f"; exit 1; }
 done
@@ -29,10 +30,10 @@ count=$(find config/prompts -type f -name '*.md' | wc -l | tr -d ' ')
 [[ "$count" -eq 4 ]] || { fail "expected 4 prompts, got $count"; exit 1; }
 ok "4 prompts"
 
-header "extensions (7 single-file .ts)"
+header "extensions (8 single-file .ts)"
 count=$(find config/extensions -maxdepth 1 -type f -name '*.ts' | wc -l | tr -d ' ')
-[[ "$count" -eq 7 ]] || { fail "expected 7 single-file extensions, got $count"; exit 1; }
-ok "7 single-file extensions"
+[[ "$count" -eq 8 ]] || { fail "expected 8 single-file extensions, got $count"; exit 1; }
+ok "8 single-file extensions"
 
 header "web bundle present"
 [[ -f config/extensions/web/index.ts ]] || { fail "missing config/extensions/web/index.ts"; exit 1; }
@@ -89,10 +90,11 @@ ok "shell syntax clean"
 
 header "lifecycle node files compile"
 for j in lifecycle/collect-metrics.js lifecycle/aggregate-week.js lifecycle/apply-update.js \
-		lifecycle/lib/db.js lifecycle/lib/brief.js bin/apple-pi; do
+		lifecycle/lib/db.js lifecycle/lib/brief.js bin/apple-pi \
+		vault/lib/vault.js vault/cli.js; do
 	node --check "$j" || { fail "$j syntax"; exit 1; }
 done
-ok "lifecycle + CLI node syntax clean"
+ok "lifecycle + CLI + vault node syntax clean"
 
 header "landing page + workflow present"
 [[ -f docs/index.html ]] || { fail "docs/index.html"; exit 1; }

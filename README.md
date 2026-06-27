@@ -64,14 +64,51 @@ on whatever you typed.
 ## Privacy posture
 
 - Your credential is captured, encrypted with your passphrase
-  (`openssl aes-256-cbc -pbkdf2 -iter 600000`) into a transient vault, and
-  **destroyed the moment the model is confirmed.**
-- The only surviving copy lives in `~/.pi/agent/auth.json` — Pi's own
+  (`openssl aes-256-cbc -pbkdf2 -iter 600000`) into the credential vault.
+  The onboarding entry is marked *transient* and **pruned the moment the
+  model is confirmed**; the vault itself persists for any keys you add later
+  (see [Credential Vault](#credential-vault)).
+- The surviving runtime copy lives in `~/.pi/agent/auth.json` — Pi's own
   mode-0600 auth store, which you manage via `/login`. Pass `--purge-auth-too`
   to remove even that at purge (then re-authorise with `/login`).
 - Plaintext creds live in-memory only; scratch is `rm -P`'d / shred.
 - The shipped config tree contains **no** hostnames, IPs, paths, or tokens
   from the author — `smoke/sanitize.sh` grep-enforces it on every change.
+
+## Credential Vault
+
+apple-pi ships a `/vault` command — an encrypted, trace-free store for the
+machine-credentials your agent needs (API keys, gateway tokens). It exists so
+the safe path is the easy path: the alternative — pasting a key into `~/.zshrc`,
+a `.env`, or the chat — leaks it into process env, crash dumps, shell history,
+and session transcripts.
+
+- **Trace-free entry.** Paste a key into a masked `/vault add` prompt; it never
+  touches your input line, so it can't end up in the session log.
+- **Encrypted at rest.** One file, `~/.pi/agent/credentials.vault`, locked with
+  a passphrase you choose, mode `0600`.
+- **You gate every reveal.** `/vault list` shows names, not secrets. Seeing a
+  key back is opt-in and warned.
+- **Onboarding cleans up after itself.** The key you paste at install is marked
+  *temporary* and pruned the moment the connection is proven — but keys you add
+  yourself stay until *you* remove them.
+
+```
+/vault add [name]              paste + store a key (masked prompt)
+/vault list                    names + metadata (never the secrets)
+/vault get <name>              reveal a key  (opt-in; warned)
+/vault rotate <name>           replace a key with a new one
+/vault import <file>           bulk-load from JSON, then shred the source
+/vault export <name>           write a key into auth.json (pi's native auth)
+/vault remove <name> · /vault lock
+```
+
+The honest threat model: the vault defends strongly against **accidental
+leakage** (logs, env, exports) — how most keys actually get exposed. It is
+*defense in depth*, not a sealed vault against a thief who has your laptop
+**and** your passphrase. For that outer wall, turn on **FileVault**. Full
+design + attacker model:
+[`.docs/features/credential-vault/`](.docs/features/credential-vault/).
 
 ## What's in the box
 
@@ -80,10 +117,10 @@ on whatever you typed.
 | Persona | 1 | `config/agent/AGENTS.md` — the contract every session loads |
 | Skills | 8 | plan-decompose, read-docs-first, verify-own-work, red-blue, long-horizon-compaction, **self-assess**, session-record, n8n-workflow-author |
 | Prompts | 4 | `/decompose`, `/spec`, `/redteam`, `/design` |
-| Extensions | 7 + web | sysinfo-guard (always on), **web** (search/fetch/browser, default on), n8n/forgejo/netbird/llm/kanban/telegram (on demand) |
+| Extensions | 9 | sysinfo-guard (always on), **web** (search/fetch/browser, default on), n8n/forgejo/netbird/llm/kanban/telegram (on demand), **credential-vault** (on demand, env-configured) |
 | Wizard | 1 | `install.sh` + `lib/` (P0–P1 + handoff) |
 | Handoff | 1 | `lib/handoff.md` — drives the agent through P2–P5 |
-| Smoke | 4 | sanitize · structure · onboard-sandbox · run |
+| Smoke | 8 | sanitize · structure · onboard-sandbox · vault-roundtrip · vault-tracefree · vault-telemetry-safe · vault-rotate-import-export · vault-onboarding |
 
 The **self-assess** skill is the heart of "tune yourself to my model" — a
 recurring 3-iteration ritual (discovery → red/blue → apply+reevaluate) that
