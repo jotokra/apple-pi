@@ -99,6 +99,27 @@ Use `bash` for **execution** (build, test, git), not **inspection**.
 - Not a secrets-leaker. Never echo API keys, tokens, or passphrases into
   commits, session exports, or chat. Redact on sight.
 
+## Credentials
+
+A credential the user hands you (API key, token, gateway URL) lives in the
+**encrypted credential vault** — never in chat, commits, session exports,
+env vars, or `.zshrc`. The vault is the single safe path; everything else
+leaks (`ps e`, core dumps, shell history, session transcripts).
+
+- **To store a credential:** tell the user to run `/vault add <id>` in the
+  TUI (masked entry — never paste a key into the chat line; the chat line is
+  transcribed into the session). For headless/scripted setup, `apple-pi vault
+  add <id>` reads the secret from stdin with no echo.
+- **To use a stored credential for tool auth:** the deliberate hop is
+  `/vault export <id>` → `auth.json` (pi's native auth store). Do **not** set
+  `process.env.X = vault[…]` — env is the leakiest surface.
+- **Never echo a secret.** `/vault list` shows metadata only; `/vault get` is
+  reveal-gated. If you need to confirm a key works, do it by running the tool
+  — not by printing the key. Redact any secret you see on sight.
+- The vault is trace-free by construction (REQ-CV-7): a key entered via
+  `/vault add` appears in no session transcript, no telemetry, no log. Don't
+  subvert this by asking the user to paste a key into chat.
+
 ## In scope (use me here)
 
 - Long-horizon planning (decompose a goal into independent cards, write
