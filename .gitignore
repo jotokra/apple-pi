@@ -21,3 +21,7 @@ node_modules/
 .idea/
 .vscode/
 *.swp
+lifecycle/lib/node_modules/
+node_modules/
+*.db
+.DS_Store
