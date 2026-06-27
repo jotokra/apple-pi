@@ -28,7 +28,11 @@ set -uo pipefail
 # Bootstrap env: APPLEPI_REPO_URL (default github.com/jotokra/apple-pi),
 # APPLEPI_HOME (default ~/.apple-pi), APPLEPI_GIT_TOKEN (private repos),
 # APPLEPI_BRANCH (default main).
-_BS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+# NOTE: under `set -u`, a piped invocation (`curl … | bash`, i.e. `bash -s`)
+# has NO source file so BASH_SOURCE[0] is unbound — referencing it bare
+# errors out. Default to $0 so the lookup is clean; the empty/cwd result
+# correctly forces the bootstrap (clone) path below.
+_BS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
 if [[ ! -d "$_BS_DIR/config" ]]; then
 	_bdie() { printf '\xc3\x97 apple-pi bootstrap: %s\n' "$*" >&2; exit 1; }
 	command -v git >/dev/null 2>&1 || _bdie "git is required for the one-liner install. Install it and re-run."
@@ -52,10 +56,35 @@ if [[ ! -d "$_BS_DIR/config" ]]; then
 		printf '   cloned to %s\n' "$CLONE_TO"
 	fi
 	# Re-exec the repo's install.sh. Scrub the token first so it can't leak into the wizard.
-	exec env -u APPLEPI_GIT_TOKEN bash "$CLONE_TO/install.sh" "$@"
+	#
+	# Red/blue — the `curl|bash` failure modes (all stem from the piped form,
+	# `bash -s`, having NO source file, so BASH_SOURCE[0] is unset):
+	#   1. EOF loop: fd 0 is the script-delivery pipe; curl closes it once the
+	#      script is delivered, so a later `read` returns EOF → the prompt loops
+	#      (`passphrase can't be empty.` × ∞). Handled by _common.sh's _input_eof
+	#      (kills the whole script on first EOF, not just the subshell).
+	#   2. `set -u` + unset BASH_SOURCE: line 75's `"${BASH_SOURCE[0]}"` aborts
+	#      under `set -u`, leaving SCRIPT_DIR wrong → lib/_common.sh doesn't load
+	#      → ask/warn/die are undefined → ANOTHER infinite loop. Handled by the
+	#      `${BASH_SOURCE[0]:-$0}` default AND by `cd "$CLONE_TO"` here so the
+	#      re-exec'd script resolves its own lib/ relative to the clone.
+	#
+	# Reattach stdin to the controlling terminal if (and only if) one is really
+	# openable: `[[ -r /dev/tty ]]` lies — it returns true even when /dev/tty
+	# can't be opened (no controlling process). Probe by actually opening it in
+	# a subshell (no side effect on the current shell); on success add `</dev/tty`
+	# to the re-exec so the wizard reads answers from the keyboard, not the
+	# now-closed script-delivery pipe. With no tty, fall through and let
+	# _common.sh's _input_eof exit cleanly on first read.
+	cd "$CLONE_TO" || _bdie "could not enter $CLONE_TO"
+	if ( exec </dev/tty ) 2>/dev/null; then
+		exec env -u APPLEPI_GIT_TOKEN bash "$CLONE_TO/install.sh" "$@" </dev/tty
+	else
+		exec env -u APPLEPI_GIT_TOKEN bash "$CLONE_TO/install.sh" "$@"
+	fi
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/_common.sh"
 
