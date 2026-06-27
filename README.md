@@ -117,7 +117,7 @@ design + attacker model:
 | Persona | 1 | `config/agent/AGENTS.md` — the contract every session loads |
 | Skills | 8 | plan-decompose, read-docs-first, verify-own-work, red-blue, long-horizon-compaction, **self-assess**, session-record, n8n-workflow-author |
 | Prompts | 4 | `/decompose`, `/spec`, `/redteam`, `/design` |
-| Extensions | 9 | sysinfo-guard (always on), **web** (search/fetch/browser, default on), n8n/forgejo/netbird/llm/kanban/telegram (on demand), **credential-vault** (on demand, env-configured) |
+| Extensions | 9 | sysinfo-guard (always on), **web** (search/fetch/browser, default on), **voice** (`/voice` ↔ pivoice), **credential-vault** (on demand, env-configured), n8n/forgejo/netbird/llm/kanban/telegram (on demand) |
 | Wizard | 1 | `install.sh` + `lib/` (P0–P1 + handoff) |
 | Handoff | 1 | `lib/handoff.md` — drives the agent through P2–P5 |
 | Smoke | 8 | sanitize · structure · onboard-sandbox · vault-roundtrip · vault-tracefree · vault-telemetry-safe · vault-rotate-import-export · vault-onboarding |
@@ -165,6 +165,21 @@ After self-improvement, apple-pi offers **one** of:
 
 The others stay available as skills/extensions for later.
 
+## Voice mode (type ⇄ talk)
+
+apple-pi bundles **pivoice** — speak a prompt, hear the reply, fully
+on-device (whisper.cpp + `say`). Type in the pi TUI, flip to voice, flip
+back — **same conversation**:
+
+- In any `pi` session, type **`/voice`** (or press **Ctrl+V**). apple-pi
+  launches pivoice on the current session; voice turns append to the same
+  JSONL.
+- Talk. Press `q` to exit voice mode.
+- Resume the TUI: **`pi -c`** — the voice turns appear in the session tree.
+
+See [`config/voice/README.md`](config/voice/README.md). (First use needs
+`brew install whisper-cpp` + a ggml model; the installer offers the brew step.)
+
 ## Using apple-pi after install
 
 ```bash
@@ -187,16 +202,37 @@ the prompts, and `/skill:self-assess` to re-tune when your stack changes.
 
 ## The autoresearch lifecycle (keeps improving)
 
+apple-pi improves on **two distinct channels**. They're kept separate on
+purpose so you always know what's *your behavior changing itself* vs what's
+*new code arriving*:
+
+| Channel | What it is | How it surfaces | How it applies |
+|---|---|---|---|
+| **Self-improvement** (`source: autoresearch`) | Changes proposed from *your own session telemetry* — tool-discipline drift, compaction pressure, error rates | Weekly brief at `~/.pi/agent/proposals/<date>.md` | `apple-pi review` → `apply --latest --yes`. **You gate it.** |
+| **Release updates** (`source: release`) | New code: new apple-pi / pivoice versions from GitHub | `apple-pi update --check` (read-only); also folded into the weekly brief | `apple-pi update --all --yes` (or `--voice`). **Never auto-installs.** |
+
+### Self-improvement loop
+
 An internal self-improvement loop runs alongside the interactive `self-assess`
 ritual:
 
 - **Daily** — `apple-pi collect` parses session telemetry into a local SQLite
   store. LLM-free, zero quota.
 - **Weekly** — `apple-pi aggregate` writes a brief of proposed improvements
-  (tool-discipline drift, compaction pressure, error rates) to
-  `~/.pi/agent/proposals/<date>.md`.
+  (each tagged `source: autoresearch`) to
+  `~/.pi/agent/proposals/<date>.md`. It also runs a read-only release check
+  and tags any behind-repo `source: release`.
 - **Review → apply** — `apple-pi review` shows the diff; `apple-pi apply
-  --latest --yes` writes it. **Nothing applies until you say yes.**
+  --latest --yes` writes self-improvement proposals. **Nothing applies until
+  you say yes.**
+
+### Release updates
+
+```bash
+apple-pi update --check        # read-only: local vs GitHub releases
+apple-pi update --all --yes    # gated: pi update --all + pull + sync pivoice
+apple-pi update --voice --yes  # gated: re-sync just the pivoice bundle
+```
 
 Install the schedule with `apple-pi schedule install` (launchd on macOS, cron
 elsewhere). See [PUBLISHING.md](PUBLISHING.md) and
