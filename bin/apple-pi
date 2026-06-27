@@ -63,6 +63,7 @@ function help() {
   reject   [--latest]            reject the latest proposal
   status                        runs / proposals / schedule state
   schedule install|status|remove|run-now   manage the daily+weekly jobs
+  vault add|list|get|remove|prune-transient   credential vault (headless)
 
 Daily collect + weekly aggregate are the only scheduled jobs. review/apply/reject
 are interactive — you drive them.`);
@@ -83,6 +84,11 @@ function main() {
 		case "reject":     return nodeRun("apply-update.js", ["reject", ...rest]);
 		case "status":     return status();
 		case "schedule":   return spawnSync(SCHED, rest, { stdio: "inherit" }).status === 0 ? 0 : 1;
+		case "vault": {
+			// credential vault — delegates to vault/cli.js (REQ-CV-1 core/CLI shim).
+			const vaultCli = require(path.join(REPO, "vault", "cli.js"));
+			return vaultCli.run(rest);
+		}
 		default:
 			console.error(`unknown command: ${cmd} (try 'apple-pi help')`);
 			process.exit(2);

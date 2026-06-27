@@ -14,6 +14,7 @@ for f in install.sh README.md LICENSE .gitignore .docs/PLAN.md \
 		lib/_common.sh lib/handoff.md \
 		lifecycle/collect-metrics.js lifecycle/aggregate-week.js lifecycle/apply-update.js \
 		lifecycle/lib/db.js lifecycle/lib/brief.js lifecycle/schema.sql lifecycle/schedule.sh \
+		vault/lib/vault.js vault/cli.js \
 		bin/apple-pi docs/index.html PUBLISHING.md; do
 	[[ -f "$f" ]] || { fail "missing $f"; exit 1; }
 done
@@ -82,10 +83,11 @@ ok "shell syntax clean"
 
 header "lifecycle node files compile"
 for j in lifecycle/collect-metrics.js lifecycle/aggregate-week.js lifecycle/apply-update.js \
-		lifecycle/lib/db.js lifecycle/lib/brief.js bin/apple-pi; do
+		lifecycle/lib/db.js lifecycle/lib/brief.js bin/apple-pi \
+		vault/lib/vault.js vault/cli.js; do
 	node --check "$j" || { fail "$j syntax"; exit 1; }
 done
-ok "lifecycle + CLI node syntax clean"
+ok "lifecycle + CLI + vault node syntax clean"
 
 header "landing page + workflow present"
 [[ -f docs/index.html ]] || { fail "docs/index.html"; exit 1; }
