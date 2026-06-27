@@ -16,6 +16,7 @@
 const { execFileSync, spawnSync } = require("node:child_process");
 const path = require("node:path");
 const { open, piDir, dbPath } = require("../lifecycle/lib/db");
+const { checkAll, renderText } = require("../lifecycle/update-check");
 
 const REPO = path.resolve(__dirname, "..");
 const LIFECYCLE = path.join(REPO, "lifecycle");
@@ -53,6 +54,48 @@ function status() {
 	if (r.status !== 0) console.log("  schedule    : (couldn't query — see schedule.sh status)");
 }
 
+function update(args) {
+	// --check (default): read-only version diff vs GitHub releases.
+	// --all:    gate, then pi update --all + re-sync vendored pivoice from upstream.
+	// --voice:  gate, then re-sync just the pivoice bundle.
+	if (args.includes("--check") || args.length === 0 || args[0] === "check") {
+		const asJson = args.includes("--json");
+		const results = checkAll();
+		if (asJson) process.stdout.write(JSON.stringify(results, null, 2) + "\n");
+		else console.log(renderText(results));
+		return 0;
+	}
+	const yes = args.includes("--yes");
+	if (!yes) {
+		console.error("apple-pi update --all/--voice applies changes. Re-run with --yes to proceed (it never auto-runs; this flag is your gate).");
+		console.error("For a read-only check, use: apple-pi update --check");
+		return 2;
+	}
+	const home = require("node:os").homedir();
+	const doAll = args.includes("--all");
+	const doVoice = args.includes("--voice");
+	if (doAll) {
+		console.log("→ pi update --all");
+		spawnSync("pi", ["update", "--all"], { stdio: "inherit" });
+		console.log("→ git -C ~/.apple-pi pull");
+		spawnSync("git", ["-C", path.join(home, ".apple-pi"), "pull", "--ff-only"], { stdio: "inherit" });
+	}
+	if (doAll || doVoice) {
+		// Re-sync the vendored pivoice from its standalone repo into the bundle.
+		const src = path.join(home, "pivoice", "pivoice.py");
+		const dst = path.join(home, ".pi", "voice", "pivoice.py");
+		const fs = require("node:fs");
+		try {
+			if (fs.existsSync(src)) { fs.copyFileSync(src, dst); console.log(`✓ synced pivoice.py → ${dst}`); }
+			else console.log(`(pivoice upstream not found at ${src}; leaving vendored copy as-is)`);
+		} catch (e) {
+			console.error(`✗ failed to sync pivoice: ${e.message}`);
+		}
+	}
+	console.log("\nRe-run 'apple-pi update --check' to confirm.");
+	return 0;
+}
+
 function help() {
 	console.log(`apple-pi — autoresearch lifecycle CLI
 
@@ -64,9 +107,19 @@ function help() {
   status                        runs / proposals / schedule state
   schedule install|status|remove|run-now   manage the daily+weekly jobs
   vault add|list|get|remove|prune-transient   credential vault (headless)
+  update [--check]              release check: local vs GitHub releases (read-only)
+  update --all --yes            apply: pi update --all + pull apple-pi + sync pivoice
+  update --voice --yes          apply: re-sync just the pivoice bundle from upstream
 
 Daily collect + weekly aggregate are the only scheduled jobs. review/apply/reject
-are interactive — you drive them.`);
+are interactive — you drive them.
+
+Two channels of change, kept distinct:
+  - self-improvement (autoresearch): derived from YOUR session telemetry,
+    proposed weekly, you review/apply. Brief labels these source: autoresearch.
+  - release updates (new code): new apple-pi/pivoice versions from GitHub.
+    'update --check' is read-only; the weekly aggregate folds in a release
+    check too. Brief labels those source: release. Never auto-installs.`);
 }
 
 function main() {
@@ -89,6 +142,7 @@ function main() {
 			const vaultCli = require(path.join(REPO, "vault", "cli.js"));
 			return vaultCli.run(rest);
 		}
+		case "update":     return update(rest);
 		default:
 			console.error(`unknown command: ${cmd} (try 'apple-pi help')`);
 			process.exit(2);

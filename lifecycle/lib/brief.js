@@ -45,7 +45,12 @@ function rollWeek(rows) {
 }
 
 // Derive concrete config-change proposals from this week vs the prior week.
-// Deterministic, LLM-free. Each proposal has {setting, from, to, rationale, severity}.
+// Deterministic, LLM-free. Each proposal has
+//   {setting, from, to, rationale, severity, source}.
+// `source` is one of:
+//   "autoresearch" — derived from your session telemetry (this loop)
+//   "release"      — a new upstream version is available (update-check)
+// so the brief can label what's behavioral vs what's a code update.
 function deriveProposals(curr, prev, currentSettings) {
 	const out = [];
 	const get = (p) => {
@@ -66,6 +71,7 @@ function deriveProposals(curr, prev, currentSettings) {
 				to: `bash ${Math.round(bp)}%`,
 				rationale: `Bash share rose ${Math.round(bp - bpp)}pts to ${Math.round(bp)}% of tool calls this week. Consider re-asserting the read/grep/find-over-bash rule in the persona.`,
 				severity: "warning",
+				source: "autoresearch",
 			});
 		}
 	}
@@ -81,6 +87,7 @@ function deriveProposals(curr, prev, currentSettings) {
 				to: proposed,
 				rationale: `${curr.compaction} compaction events this week — raising keepRecentTokens gives the model more raw context per compaction on a large-context model.`,
 				severity: "medium",
+				source: "autoresearch",
 			});
 		}
 	}
@@ -95,6 +102,7 @@ function deriveProposals(curr, prev, currentSettings) {
 				to: `${errRate.toFixed(1)}% of turns`,
 				rationale: `Tool error rate is ${errRate.toFixed(1)}% this week. No config change proposed — review the errors, may indicate a flaky tool or a prompt issue.`,
 				severity: "info",
+				source: "autoresearch",
 			});
 		}
 	}
