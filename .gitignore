@@ -1,0 +1,23 @@
+# apple-pi ships NO secrets. Onboarding artifacts are runtime-only and
+# must never be committed.
+**/auth.json
+**/onboarding.vault
+**/onboarding.vault.*
+**/.onboarding/
+discovery.json
+self-assessment-*.md
+
+# Onboarding may render these templates into a real ~/.pi; never track
+# the rendered copies if someone symlinks the repo in.
+settings.json
+!config/agent/settings.json.template
+
+# Node / TS
+node_modules/
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp

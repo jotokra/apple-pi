@@ -1,0 +1,45 @@
+{
+  "_comment": "apple-pi global config. The onboarding wizard fills in the model fields and resolves the sysinfo-guard extension path. Onboarding's self-improvement phase (P3) then retunes thinking levels, compaction reserve, and favourites to the confirmed model's REAL capabilities. See .docs/PLAN.md.",
+  "defaultProvider": "__APPLEPI_PROVIDER__",
+  "defaultModel": "__APPLEPI_MODEL__",
+  "defaultThinkingLevel": "high",
+  "_thinking_comment": "Placeholder. P3 (self-improvement) reads the model's thinkingLevelMap from the pi-ai catalog and rewrites this to the model's real top tier (e.g. 'xhigh' for effort-based models, or a budget-appropriate level for token-budget models). Do not hand-tune before P3 has run.",
+  "hideThinkingBlock": false,
+  "theme": "dark",
+  "quietStartup": false,
+  "defaultProjectTrust": "never",
+  "collapseChangelog": true,
+  "doubleEscapeAction": "tree",
+  "treeFilterMode": "no-tools",
+  "editorPaddingX": 1,
+  "autocompleteMaxVisible": 8,
+  "_models": {
+    "_comment": "Ctrl+P favourites. Populated by P3 from runnable, keyed models only. Empty until the model is confirmed and scanned.",
+    "favorites": [
+      "__APPLEPI_PROVIDER__/__APPLEPI_MODEL__"
+    ]
+  },
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "_reserve_comment": "P3 scales this to the confirmed model's context window (e.g. larger reserve for 1M-context models).",
+    "keepRecentTokens": 64000
+  },
+  "extensions": [
+    "__APPLEPI_EXT_SYSINFO__"
+  ],
+  "_extensions_comment": "Only sysinfo-guard (the red/blue default) is enabled at bootstrap. n8n/forgejo/netbird/llm/kanban/telegram are added here on demand by the workflow-offer phase or by hand, after their env vars are set.",
+  "skills": [
+    "__APPLEPI_SKILLS_DIR__"
+  ],
+  "promptTemplates": [
+    "__APPLEPI_PROMPTS_DIR__"
+  ],
+  "themes": [],
+  "shellPath": "__APPLEPI_SHELL__",
+  "sessionDir": "__APPLEPI_SESSIONS_DIR__",
+  "tools": {
+    "_comment": "Built-in tool allowlist. Extension tools (n8n_*, forgejo_*, netbird_*, llm_*, kanban_*, telegram_*) are registered by their extension files when enabled.",
+    "allow": ["read", "write", "edit", "bash", "grep", "find", "ls"]
+  }
+}
