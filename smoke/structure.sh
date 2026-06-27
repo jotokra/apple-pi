@@ -15,7 +15,7 @@ for f in install.sh README.md LICENSE .gitignore .docs/PLAN.md \
 		lifecycle/collect-metrics.js lifecycle/aggregate-week.js lifecycle/apply-update.js \
 		lifecycle/lib/db.js lifecycle/lib/brief.js lifecycle/schema.sql lifecycle/schedule.sh \
 		vault/lib/vault.js vault/cli.js \
-		bin/apple-pi docs/index.html PUBLISHING.md; do
+		bin/apple-pi docs/index.html docs/HOWTO.md PUBLISHING.md; do
 	[[ -f "$f" ]] || { fail "missing $f"; exit 1; }
 done
 ok "required files"
