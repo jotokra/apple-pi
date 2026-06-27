@@ -1,0 +1,16 @@
+{
+  "name": "pivoice",
+  "version": "0.1.0",
+  "description": "Voice front-end for the pi coding agent (bundled with apple-pi).",
+  "type": "module",
+  "private": true,
+  "pi": {
+    "extensions": ["../extensions/voice.ts"]
+  },
+  "bin": {
+    "pivoice": "./bin/pivoice"
+  },
+  "runtimeDeps": {
+    "note": "OS-level, not npm: python3, ffmpeg, whisper-cpp (Homebrew), macOS 'say'. Installer offers to brew-install them."
+  }
+}
