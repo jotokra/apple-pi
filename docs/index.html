@@ -90,7 +90,7 @@
 
 	<div class="install" id="installbox">
 		<button class="copy" onclick="copyInstall()" aria-label="Copy install command">copy</button>
-		<span class="prompt">$</span><span class="cmd">curl -fsSL https://jotokra.github.io/apple-pi/install.sh | bash</span>
+		<span class="prompt">$</span><span class="cmd">curl -fsSL https://raw.githubusercontent.com/jotokra/apple-pi/main/install.sh | bash</span>
 	</div>
 
 	<div class="ctas">
@@ -152,7 +152,7 @@ hand off → agent asks to look around → <b>tunes config to your model</b> →
 
 <script>
 	function copyInstall() {
-		const text = 'curl -fsSL https://jotokra.github.io/apple-pi/install.sh | bash';
+		const text = 'curl -fsSL https://raw.githubusercontent.com/jotokra/apple-pi/main/install.sh | bash';
 		navigator.clipboard.writeText(text).then(function () {
 			const btn = document.querySelector('.copy');
 			const old = btn.textContent;

@@ -20,7 +20,7 @@ clone-and-run repo. **Zero personal information is shipped** — the
 **One line:**
 
 ```bash
-curl -fsSL https://jotokra.github.io/apple-pi/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/jotokra/apple-pi/main/install.sh | bash
 ```
 
 …or clone-and-run:
