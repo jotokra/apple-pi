@@ -317,6 +317,32 @@ _install_tree skills
 _install_tree prompts
 _install_tree extensions
 
+# Voice bundle ships as a pi package (pivoice.py + bin + manifest). OS deps
+# (python3, ffmpeg, whisper-cpp) are runtime — offer to brew-install them,
+# best-effort, never fail onboarding. The bridge extension in config/extensions
+# launches the bundled pivoice; /voice works once deps are in place.
+VOICE_DIR="$PI_DIR/voice"
+if [[ -d "$REPO_DIR/config/voice" ]]; then
+	rm -rf "$VOICE_DIR"
+	cp -R "$REPO_DIR/config/voice" "$VOICE_DIR" || die "failed to copy config/voice"
+	ok "copied config/voice → $VOICE_DIR"
+	# best-effort OS deps (warn-only)
+	if command -v brew >/dev/null 2>&1; then
+		for pkg in ffmpeg whisper-cpp; do
+			command -v "${pkg%-*}" >/dev/null 2>&1 || command -v "$pkg" >/dev/null 2>&1 || \
+				brew install "$pkg" >/dev/null 2>&1 && ok "brew: $pkg ready" || warn "brew install $pkg failed — install later for voice mode"
+		done
+	fi
+	command -v python3 >/dev/null 2>&1 || warn "python3 not found — voice mode needs it"
+	# the ggml model is ~465MB; download lazily (first /voice run can offer it),
+	# but seed the dir so pivoice finds it.
+	mkdir -p "$VOICE_DIR/models"
+	warn "voice mode: download a whisper model before first use:"
+	warn "  curl -L -o $VOICE_DIR/models/ggml-small.en.bin \\\\"
+	warn "    https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin"
+	warn "  add $VOICE_DIR/bin to PATH for standalone 'pivoice' (optional; /voice doesn't need it)"
+fi
+
 # Web bundle ships with its own package.json (playwright + node-html-parser).
 # Best-effort `npm install` so its tools work out of the box; never fail the
 # whole onboarding if Node/npm are missing or it errors (tools degrade with a
@@ -342,6 +368,7 @@ ok "installed persona → $AGENT_DIR/AGENTS.md"
 SHELL_BIN="$(command -v zsh || command -v bash || echo /bin/sh)"
 EXT_SYSINFO="$PI_DIR/extensions/sysinfo-guard.ts"
 EXT_WEB="$PI_DIR/extensions/web"
+EXT_VOICE="$PI_DIR/extensions/voice.ts"
 
 # Render settings.json from the template.
 TEMPLATE="$REPO_DIR/config/agent/settings.json.template"
@@ -356,6 +383,7 @@ sed \
 	-e "s#__APPLEPI_MODEL__#${MODEL}#g" \
 	-e "s#__APPLEPI_EXT_SYSINFO__#${EXT_SYSINFO}#g" \
 	-e "s#__APPLEPI_EXT_WEB__#${EXT_WEB}#g" \
+	-e "s#__APPLEPI_EXT_VOICE__#${EXT_VOICE}#g" \
 	-e "s#__APPLEPI_SKILLS_DIR__#$PI_DIR/skills#g" \
 	-e "s#__APPLEPI_PROMPTS_DIR__#$PI_DIR/prompts#g" \
 	-e "s#__APPLEPI_SHELL__#${SHELL_BIN}#g" \

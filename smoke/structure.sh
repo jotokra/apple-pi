@@ -41,8 +41,17 @@ node -e "const p=JSON.parse(require('fs').readFileSync('config/extensions/web/pa
 	|| { fail "config/extensions/web/package.json missing pi.extensions manifest -> ./index.ts"; exit 1; }
 ok "web bundle (index.ts + valid package.json manifest)"
 
+header "voice package present"
+[[ -f config/voice/pivoice.py ]] || { fail "missing config/voice/pivoice.py"; exit 1; }
+[[ -x config/voice/bin/pivoice ]] || { fail "config/voice/bin/pivoice not executable"; exit 1; }
+node -e "const p=JSON.parse(require('fs').readFileSync('config/voice/package.json','utf8')); if(!p.bin||!p.bin.pivoice) throw 0" 2>/dev/null \
+	|| { fail "config/voice/package.json missing bin.pivoice"; exit 1; }
+python3 -c "import ast,sys; ast.parse(open('config/voice/pivoice.py').read())" 2>/dev/null \
+	|| { fail "config/voice/pivoice.py does not parse"; exit 1; }
+ok "voice package (pivoice.py parses + bin + manifest)"
+
 header "settings.json.template placeholders"
-for ph in __APPLEPI_PROVIDER__ __APPLEPI_MODEL__ __APPLEPI_EXT_SYSINFO__ __APPLEPI_EXT_WEB__ \
+for ph in __APPLEPI_PROVIDER__ __APPLEPI_MODEL__ __APPLEPI_EXT_SYSINFO__ __APPLEPI_EXT_WEB__ __APPLEPI_EXT_VOICE__ \
 		__APPLEPI_SKILLS_DIR__ __APPLEPI_PROMPTS_DIR__ __APPLEPI_SHELL__ \
 		__APPLEPI_SESSIONS_DIR__; do
 	grep -q "$ph" config/agent/settings.json.template || { fail "missing placeholder $ph"; exit 1; }
@@ -67,6 +76,7 @@ sed -e 's#__APPLEPI_PROVIDER__#openai#' \
 	-e 's#__APPLEPI_MODEL__#gpt-test#' \
 	-e 's#__APPLEPI_EXT_SYSINFO__#/tmp/x.ts#' \
 	-e 's#__APPLEPI_EXT_WEB__#/tmp/web#' \
+	-e 's#__APPLEPI_EXT_VOICE__#/tmp/voice.ts#' \
 	-e 's#__APPLEPI_SKILLS_DIR__#/tmp/skills#' \
 	-e 's#__APPLEPI_PROMPTS_DIR__#/tmp/prompts#' \
 	-e 's#__APPLEPI_SHELL__#/bin/zsh#' \
