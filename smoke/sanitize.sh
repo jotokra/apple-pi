@@ -49,7 +49,7 @@ for tok in "${FORBIDDEN[@]}"; do
 		[[ -z "$hit" ]] && continue
 		fail "forbidden token /$tok/ → $hit"
 		VIOLATIONS=$((VIOLATIONS + 1))
-	done < <(grep -rnE "$tok" "${SCAN_PATHS[@]}" 2>/dev/null)
+	done < <(grep -rnE --exclude-dir=node_modules "$tok" "${SCAN_PATHS[@]}" 2>/dev/null)
 done
 
 # Assert the template uses placeholders (not concrete model/provider defaults).

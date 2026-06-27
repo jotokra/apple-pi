@@ -355,6 +355,32 @@
 	</div>
 </section>
 
+<!-- ═══ ACTS ON THE LIVE WEB ═══ -->
+<section>
+	<div class="wrap">
+		<p class="eyebrow">Beyond the filesystem</p>
+		<h2>The agent can <span class="accent">see and act on the live web.</span></h2>
+		<p style="color:var(--muted);max-width:46rem;">A bundled web extension — on by default — turns “use the best viable way” outward: search the web,
+			read pages, and drive <strong>your own persistent, headed Chrome</strong> so you watch every click. Logins survive between runs.</p>
+		<div class="loop">
+			<div class="node">
+				<h4>web_search</h4>
+				<p>Ranked results (title / url / snippet). DuckDuckGo free; Tavily / Brave via key.</p>
+			</div>
+			<div class="node">
+				<h4>web_fetch</h4>
+				<p>URL &rarr; cleaned markdown. Renders JavaScript-heavy SPAs through the browser on demand.</p>
+			</div>
+			<div class="node">
+				<h4>browser_*</h4>
+				<p>Snapshot &rarr; click / type / check by ref, screenshot, tabs. The agent confirms before any payment or deletion.</p>
+			</div>
+		</div>
+	</div>
+</section>
+
+<div class="wrap"><div class="divider"></div></div>
+
 <!-- ═══ IN THE BOX ═══ -->
 <section>
 	<div class="wrap">
@@ -363,7 +389,7 @@
 		<div class="proof">
 			<div class="stat"><div class="v">8</div><div class="l">methodology skills</div></div>
 			<div class="stat"><div class="v">4</div><div class="l">prompt templates</div></div>
-			<div class="stat"><div class="v">7</div><div class="l">tool extensions</div></div>
+			<div class="stat"><div class="v">8</div><div class="l">tool extensions</div></div>
 			<div class="stat"><div class="v">10</div><div class="l">provider guides</div></div>
 			<div class="stat"><div class="v">0<span class="u">B</span></div><div class="l">tracked personal data</div></div>
 		</div>
@@ -389,6 +415,7 @@
 				<p>Optional tools, all env-configured (no baked-in endpoints):</p>
 				<ul>
 					<li>sysinfo-guard (always on — blocks <code>rm -rf /</code>)</li>
+					<li><strong>web</strong> — search · fetch · drive your headed Chrome (default on)</li>
 					<li>n8n · forgejo · netbird · llm-sidecar</li>
 					<li>kanban · telegram</li>
 				</ul>
