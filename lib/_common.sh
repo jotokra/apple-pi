@@ -8,6 +8,22 @@ else
 	C_RED=""; C_GREEN=""; C_YELLOW=""; C_CYAN=""; C_BOLD=""; C_OFF=""
 fi
 
+# _input_eof — fatal: stdin closed mid-prompt.
+#
+# ask/ask_secret/yorn are ALWAYS invoked inside command substitution (a
+# subshell), so a plain `exit` here would only end the subshell and the
+# caller would loop forever on the empty result (this was the `curl|bash`
+# infinite-loop bug: "passphrase can't be empty." × ∞). Kill the WHOLE
+# script instead so a missing/closed tty fails loud and exactly once.
+# `$$` is the top-level shell PID even from inside a subshell.
+_input_eof() {
+	echo >&2
+	echo "${C_RED}✗ apple-pi: input closed (EOF).${C_OFF}" >&2
+	echo "${C_RED}  Run apple-pi from an interactive terminal, or pipe answers via stdin.${C_OFF}" >&2
+	kill -TERM "$$" 2>/dev/null || true
+	exit 130
+}
+
 banner() {
 	echo
 	echo "${C_BOLD}${C_CYAN}┌─ apple-pi ─────────────────────────────────────────${C_OFF}"
@@ -31,10 +47,10 @@ ask() {
 	[[ -n "$default" ]] && suffix=" ${C_YELLOW}[$default]${C_OFF}"
 	local reply
 	if [[ -n "$default" ]]; then
-		read -rp "${C_BOLD}${prompt}${suffix}:${C_OFF} " reply || die "input closed (EOF)"
+		read -rp "${C_BOLD}${prompt}${suffix}:${C_OFF} " reply || _input_eof
 		echo "${reply:-$default}"
 	else
-		read -rp "${C_BOLD}${prompt}:${C_OFF} " reply || die "input closed (EOF)"
+		read -rp "${C_BOLD}${prompt}:${C_OFF} " reply || _input_eof
 		echo "$reply"
 	fi
 }
@@ -43,7 +59,7 @@ ask() {
 ask_secret() {
 	local prompt="$1"
 	local reply
-	read -rs -p "${C_BOLD}${prompt}:${C_OFF} " reply || die "input closed (EOF)"
+	read -rs -p "${C_BOLD}${prompt}:${C_OFF} " reply || _input_eof
 	echo >&2
 	echo "$reply"
 }
@@ -54,7 +70,7 @@ yorn() {
 	local hint="y/N"; [[ "$default" == "y" ]] && hint="Y/n"
 	local reply
 	while true; do
-		read -rp "${C_BOLD}${prompt}${C_OFF} ${C_YELLOW}[$hint]${C_OFF} " reply || die "input closed (EOF)"
+		read -rp "${C_BOLD}${prompt}${C_OFF} ${C_YELLOW}[$hint]${C_OFF} " reply || _input_eof
 		reply="${reply:-$default}"
 		case "$reply" in
 			y|Y|yes) echo "y"; return ;;
