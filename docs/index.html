@@ -355,6 +355,17 @@
 	</div>
 </section>
 
+<!-- ═══ TYPE IT, OR TALK IT (VOICE) ═══ -->
+<section>
+	<div class="wrap">
+		<p class="eyebrow">Voice mode</p>
+		<h2>Type it, <span class="accent">or talk it.</span> Same conversation.</h2>
+		<p style="color:var(--muted);max-width:46rem;">Type in the pi TUI, then <code>/voice</code> (or Ctrl+V) flips the session into <strong>pivoice</strong> — on-device speech-to-text (whisper.cpp) and text-to-speech (<code>say</code>). Your voice turns append to the same JSONL; <code>pi -c</code> brings them back into the tree. One conversation, two ways in.</p>
+	</div>
+</section>
+
+<div class="wrap"><div class="divider"></div></div>
+
 <!-- ═══ ACTS ON THE LIVE WEB ═══ -->
 <section>
 	<div class="wrap">
@@ -374,6 +385,30 @@
 			<div class="node">
 				<h4>browser_*</h4>
 				<p>Snapshot &rarr; click / type / check by ref, screenshot, tabs. The agent confirms before any payment or deletion.</p>
+			</div>
+		</div>
+	</div>
+</section>
+
+<div class="wrap"><div class="divider"></div></div>
+
+<!-- ═══ TWO CHANNELS OF IMPROVEMENT ═══ -->
+<section>
+	<div class="wrap">
+		<p class="eyebrow">Two channels, kept distinct</p>
+		<h2>Know what's <span class="accent">your behavior adapting</span> vs <span class="accent">new code arriving.</span></h2>
+		<div class="loop">
+			<div class="node">
+				<h4>self-improvement</h4>
+				<p>Proposals derived from <em>your</em> session telemetry — tool-discipline drift, compaction pressure, error rates. Tagged <code>source: autoresearch</code>. You <code>review</code> then <code>apply --yes</code>.</p>
+			</div>
+			<div class="node">
+				<h4>release updates</h4>
+				<p>New apple-pi / pivoice versions from GitHub. <code>update --check</code> is read-only; folded into the weekly brief too. Tagged <code>source: release</code>. <strong>Never auto-installs.</strong></p>
+			</div>
+			<div class="node gate">
+				<h4>you gate both</h4>
+				<p>Nothing writes itself. The brief proposes; you read the diff and say yes — for config <em>and</em> for code.</p>
 			</div>
 		</div>
 	</div>
@@ -416,6 +451,7 @@
 				<ul>
 					<li>sysinfo-guard (always on — blocks <code>rm -rf /</code>)</li>
 					<li><strong>web</strong> — search · fetch · drive your headed Chrome (default on)</li>
+					<li><strong>voice</strong> — <code>/voice</code> flips the session to pivoice (type ⇄ talk)</li>
 					<li><strong>credential-vault</strong> — encrypted, trace-free key store (<code>/vault</code>)</li>
 					<li>n8n · forgejo · netbird · llm-sidecar</li>
 					<li>kanban · telegram</li>
