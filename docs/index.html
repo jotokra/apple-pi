@@ -3,151 +3,405 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>apple-pi — delicious and warm. Better than other pi's.</title>
-<meta name="description" content="A refined, self-tuning Pi Coding Agent distribution. You bring a model; apple-pi boots, destroys the bootstrap secrets, tunes itself to your model, and offers a workflow.">
+<title>apple-pi — a self-tuning, privacy-first coding agent you own</title>
+<meta name="description" content="A refined distribution of the Pi Coding Agent. Bring any model; apple-pi handles onboarding, encrypts and destroys your key, tunes itself to your model, and improves itself — with you in control.">
 <style>
 	:root {
-		--bg: #0d1117; --card: #161b22; --border: #30363d; --text: #e6edf3;
-		--muted: #8b949e; --accent: #f0883e; --accent2: #d2a8ff; --green: #3fb950;
+		/* warm "apple" palette: blossom-pink + baked-gold on warm near-black */
+		--bg:        #160f0c;
+		--bg-soft:   #1f1612;
+		--card:      rgba(255, 246, 235, 0.035);
+		--card-brd:  rgba(255, 246, 235, 0.09);
+		--card-hov:  rgba(255, 246, 235, 0.06);
+		--text:      #f7efe4;
+		--muted:     #b09a89;
+		--dim:       #8a7766;
+		--pink:      #ff7a9c;   /* apple-blossom */
+		--pink-deep: #e85d7e;
+		--gold:      #f0a868;   /* baked-apple gold */
+		--gold-soft: #ffc987;
+		--green:     #7fd1a1;
 		--mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-		--sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+		--sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
 	}
 	* { box-sizing: border-box; }
+	html { scroll-behavior: smooth; }
 	body {
 		margin: 0; background: var(--bg); color: var(--text);
-		font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased;
+		font-family: var(--sans); line-height: 1.65;
+		-webkit-font-smoothing: antialiased;
+		overflow-x: hidden;
 	}
-	.hero {
-		max-width: 760px; margin: 0 auto; padding: 4.5rem 1.5rem 2rem; text-align: center;
+	/* warm radial mesh — feels like heat from an oven, not a cold dev tool */
+	body::before {
+		content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+		background:
+			radial-gradient(60rem 40rem at 15% -5%, rgba(255, 122, 156, 0.16), transparent 60%),
+			radial-gradient(50rem 40rem at 95% 5%,  rgba(240, 168, 104, 0.13), transparent 60%),
+			radial-gradient(40rem 30rem at 50% 110%, rgba(255, 122, 156, 0.08), transparent 60%);
 	}
-	.pie { font-size: 4rem; line-height: 1; margin-bottom: 0.5rem; }
+	.wrap { max-width: 880px; margin: 0 auto; padding: 0 1.5rem; }
+
+	/* ── hero ──────────────────────────────────────────────────────── */
+	.hero { padding: 5rem 0 3rem; text-align: center; }
+	.badge {
+		display: inline-block; font-size: 0.78rem; letter-spacing: 0.02em;
+		color: var(--gold-soft); background: rgba(240, 168, 104, 0.08);
+		border: 1px solid rgba(240, 168, 104, 0.22); border-radius: 999px;
+		padding: 0.3rem 0.85rem; margin-bottom: 1.4rem;
+	}
+	.pie { font-size: 4.5rem; line-height: 1; margin-bottom: 0.6rem; filter: drop-shadow(0 6px 18px rgba(255,122,156,0.35)); }
 	h1 {
-		font-size: 2.4rem; margin: 0.5rem 0; letter-spacing: -0.02em; font-weight: 700;
+		font-size: clamp(2.6rem, 7vw, 3.8rem); margin: 0; letter-spacing: -0.03em;
+		font-weight: 800; line-height: 1.05;
+		background: linear-gradient(120deg, var(--text) 30%, var(--pink) 70%, var(--gold));
+		-webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 	}
-	.tagline {
-		font-size: 1.1rem; color: var(--muted); margin: 0 auto 1.75rem; max-width: 540px;
+	.lede {
+		font-size: clamp(1.05rem, 2.4vw, 1.25rem); color: var(--muted);
+		max-width: 640px; margin: 1.1rem auto 0;
 	}
-	.tagline strong { color: var(--accent); font-weight: 600; }
+	.lede strong { color: var(--text); font-weight: 600; }
+
 	.install {
-		background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-		padding: 1rem 1.25rem; margin: 1.5rem auto; max-width: 620px; text-align: left;
-		font-family: var(--mono); font-size: 0.86rem; position: relative; overflow-x: auto;
+		background: var(--bg-soft); border: 1px solid var(--card-brd); border-radius: 12px;
+		padding: 0.95rem 1.2rem; margin: 2rem auto 1rem; max-width: 640px; text-align: left;
+		font-family: var(--mono); font-size: 0.85rem; position: relative; overflow-x: auto;
+		box-shadow: 0 10px 40px -12px rgba(0,0,0,0.5);
 	}
-	.install .prompt { color: var(--green); user-select: none; margin-right: 0.5rem; }
+	.install .prompt { color: var(--pink); user-select: none; margin-right: 0.5rem; }
 	.install .cmd { color: var(--text); word-break: break-all; }
 	.copy {
-		position: absolute; top: 0.6rem; right: 0.6rem; background: var(--bg);
-		border: 1px solid var(--border); color: var(--muted); border-radius: 6px;
-		padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; font-family: var(--sans);
+		position: absolute; top: 0.55rem; right: 0.55rem; background: rgba(255,246,235,0.06);
+		border: 1px solid var(--card-brd); color: var(--muted); border-radius: 7px;
+		padding: 0.28rem 0.65rem; font-size: 0.74rem; cursor: pointer; font-family: var(--sans);
+		transition: all 0.15s ease;
 	}
-	.copy:hover { color: var(--text); border-color: var(--muted); }
-	.ctas { margin: 1.5rem 0; }
+	.copy:hover { color: var(--text); border-color: var(--pink); }
+	.ctas { margin: 1.6rem 0 0; }
 	.ctas a {
-		display: inline-block; margin: 0 0.4rem; padding: 0.6rem 1.2rem; border-radius: 8px;
-		text-decoration: none; font-weight: 600; font-size: 0.95rem; border: 1px solid var(--border);
+		display: inline-block; margin: 0.35rem; padding: 0.7rem 1.4rem; border-radius: 10px;
+		text-decoration: none; font-weight: 600; font-size: 0.97rem; border: 1px solid transparent;
+		transition: transform 0.15s ease, box-shadow 0.15s ease;
 	}
-	.ctas .primary { background: var(--accent); color: #1a1108; border-color: var(--accent); }
-	.ctas .ghost { background: transparent; color: var(--text); }
-	section {
-		max-width: 760px; margin: 0 auto; padding: 1.5rem 1.5rem;
+	.ctas .primary {
+		background: linear-gradient(120deg, var(--pink-deep), var(--gold));
+		color: #2a1208; box-shadow: 0 8px 24px -8px rgba(232,93,126,0.6);
 	}
-	.grid {
-		display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-		gap: 1rem; margin-top: 1rem;
+	.ctas .primary:hover { transform: translateY(-1px); box-shadow: 0 12px 30px -8px rgba(232,93,126,0.75); }
+	.ctas .ghost { background: var(--card); color: var(--text); border-color: var(--card-brd); }
+	.ctas .ghost:hover { background: var(--card-hov); }
+
+	/* ── section scaffolding ───────────────────────────────────────── */
+	section { padding: 3rem 0; }
+	.eyebrow {
+		font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase;
+		color: var(--pink); font-weight: 600; margin: 0 0 0.5rem;
 	}
-	.card {
-		background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-		padding: 1.25rem;
+	h2 {
+		font-size: clamp(1.6rem, 4vw, 2.1rem); margin: 0 0 1rem; letter-spacing: -0.02em;
+		font-weight: 700; line-height: 1.2;
 	}
-	.card h3 { margin: 0 0 0.4rem; font-size: 1rem; color: var(--accent2); }
-	.card p { margin: 0; font-size: 0.9rem; color: var(--muted); }
-	.flow {
-		font-family: var(--mono); font-size: 0.82rem; background: var(--card);
-		border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem;
-		overflow-x: auto; white-space: pre; color: var(--muted); margin-top: 1rem;
+	h2 .accent { color: var(--gold); }
+	p.lead { font-size: 1.08rem; color: var(--muted); max-width: 660px; }
+	.divider { height: 1px; background: linear-gradient(90deg, transparent, var(--card-brd), transparent); margin: 0; }
+
+	/* ── pillars (the four proven advantages) ──────────────────────── */
+	.pillars { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+	.pillar {
+		background: var(--card); border: 1px solid var(--card-brd); border-radius: 14px;
+		padding: 1.5rem 1.4rem; backdrop-filter: blur(8px);
+		transition: border-color 0.2s ease, transform 0.2s ease;
 	}
-	.flow b { color: var(--text); font-weight: 600; }
-	h2 { font-size: 1.4rem; margin: 2.5rem 0 0.5rem; letter-spacing: -0.01em; }
-	h2 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
-	ul { padding-left: 1.2rem; color: var(--muted); }
-	ul li { margin-bottom: 0.3rem; }
-	ul li strong { color: var(--text); }
-	footer {
-		text-align: center; padding: 3rem 1.5rem 2rem; color: var(--muted); font-size: 0.85rem;
+	.pillar:hover { border-color: rgba(255,122,156,0.35); transform: translateY(-3px); }
+	.pillar .ico { font-size: 1.5rem; margin-bottom: 0.6rem; display: block; }
+	.pillar h3 { margin: 0 0 0.5rem; font-size: 1.12rem; color: var(--text); }
+	.pillar p { margin: 0; font-size: 0.93rem; color: var(--muted); }
+	.pillar .tag {
+		display: inline-block; margin-top: 0.85rem; font-size: 0.76rem; font-family: var(--mono);
+		color: var(--green); background: rgba(127,209,161,0.07); border: 1px solid rgba(127,209,161,0.18);
+		border-radius: 5px; padding: 0.15rem 0.5rem;
 	}
-	footer a { color: var(--accent2); text-decoration: none; }
-	@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+	/* ── flow steps (onboarding lifecycle) ─────────────────────────── */
+	.flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.5rem; margin: 1.8rem 0 0.5rem; }
+	.step {
+		flex: 1 1 130px; background: var(--card); border: 1px solid var(--card-brd);
+		border-radius: 11px; padding: 0.9rem 0.85rem; text-align: center; position: relative;
+	}
+	.step .n {
+		width: 1.6rem; height: 1.6rem; line-height: 1.6rem; border-radius: 50%; margin: 0 auto 0.5rem;
+		font-size: 0.8rem; font-weight: 700; color: #2a1208;
+		background: linear-gradient(120deg, var(--pink), var(--gold));
+	}
+	.step .t { font-size: 0.88rem; font-weight: 600; color: var(--text); }
+	.step .s { font-size: 0.76rem; color: var(--dim); margin-top: 0.2rem; }
+	.step.destroy { border-color: rgba(127,209,161,0.35); }
+	.step.destroy .n { background: linear-gradient(120deg, var(--green), #4fb87f); }
+	.arrow {
+		display: flex; align-items: center; color: var(--dim); font-size: 1.1rem;
+		font-weight: 300; user-select: none;
+	}
+
+	/* ── loop diagram (autoresearch) ───────────────────────────────── */
+	.loop { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.8rem; margin-top: 1.5rem; }
+	.loop .node {
+		background: var(--bg-soft); border: 1px solid var(--card-brd); border-radius: 12px;
+		padding: 1.1rem 1rem; position: relative;
+	}
+	.loop .node h4 { margin: 0 0 0.35rem; font-size: 0.96rem; color: var(--gold); }
+	.loop .node p { margin: 0; font-size: 0.84rem; color: var(--muted); }
+	.loop .gate {
+		border-color: rgba(127,209,161,0.35);
+		background: linear-gradient(160deg, rgba(127,209,161,0.06), transparent);
+	}
+	.loop .gate h4 { color: var(--green); }
+
+	/* ── in-the-box grid ───────────────────────────────────────────── */
+	.box { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+	.box .item {
+		background: var(--card); border: 1px solid var(--card-brd); border-radius: 12px; padding: 1.2rem;
+	}
+	.box .item h3 { margin: 0 0 0.5rem; font-size: 1rem; color: var(--pink); }
+	.box .item p { margin: 0; font-size: 0.88rem; color: var(--muted); }
+	.box .item ul { margin: 0.4rem 0 0; padding-left: 1.1rem; color: var(--dim); font-size: 0.84rem; }
+	.box .item li { margin-bottom: 0.2rem; }
+
+	/* ── proof strip ───────────────────────────────────────────────── */
+	.proof {
+		display: flex; flex-wrap: wrap; gap: 1.5rem 2.5rem; margin-top: 1.5rem;
+		padding: 1.4rem 1.6rem; background: var(--card); border: 1px solid var(--card-brd); border-radius: 14px;
+	}
+	.proof .stat { min-width: 120px; }
+	.proof .stat .v { font-size: 1.7rem; font-weight: 800; color: var(--text); line-height: 1; }
+	.proof .stat .v .u { color: var(--gold); }
+	.proof .stat .l { font-size: 0.82rem; color: var(--muted); margin-top: 0.3rem; }
+
+	footer { text-align: center; padding: 3rem 1.5rem 2.5rem; color: var(--dim); font-size: 0.86rem; }
+	footer a { color: var(--pink); text-decoration: none; }
+	footer a:hover { text-decoration: underline; }
+	@media (prefers-reduced-motion: reduce) { *, ::before, ::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
 </style>
 </head>
 <body>
 
 <header class="hero">
-	<div class="pie" aria-hidden="true">🥧</div>
-	<h1>apple-pi</h1>
-	<p class="tagline"><strong>Delicious and warm. Better than other pi's.</strong><br>
-		A refined, self-tuning distribution of the <a href="https://pi.dev" style="color:var(--accent2)">Pi Coding Agent</a>.
-		You bring a model; apple-pi boots, destroys the bootstrap secrets, tunes itself to your model, and offers a workflow.</p>
+	<div class="wrap">
+		<span class="badge">🥧 a distribution of the Pi Coding Agent · MIT · open source</span>
+		<div class="pie" aria-hidden="true">🥧</div>
+		<h1>apple-pi</h1>
+		<p class="lede">A <strong>self-tuning, privacy-first</strong> coding agent you actually own.
+			Bring any model — apple-pi guides you to a key, <strong>proves the connection works</strong>,
+			erases the key the moment it's confirmed, and tunes itself to your model's real strengths.</p>
 
-	<div class="install" id="installbox">
-		<button class="copy" onclick="copyInstall()" aria-label="Copy install command">copy</button>
-		<span class="prompt">$</span><span class="cmd">curl -fsSL https://raw.githubusercontent.com/jotokra/apple-pi/main/install.sh | bash</span>
-	</div>
+		<div class="install" id="installbox">
+			<button class="copy" onclick="copyInstall()" aria-label="Copy install command">copy</button>
+			<span class="prompt">$</span><span class="cmd">curl -fsSL https://raw.githubusercontent.com/jotokra/apple-pi/main/install.sh | bash</span>
+		</div>
 
-	<div class="ctas">
-		<a class="primary" href="https://github.com/jotokra/apple-pi">View on GitHub</a>
-		<a class="ghost" href="https://github.com/jotokra/apple-pi#readme">Read the docs</a>
+		<div class="ctas">
+			<a class="primary" href="https://github.com/jotokra/apple-pi">View on GitHub</a>
+			<a class="ghost" href="#how">See how it works</a>
+		</div>
+		<p style="color:var(--dim); font-size:0.82rem; margin-top:1.1rem;">
+			<em>"Delicious and warm. Better than other pi's."</em> — the personality stays; the pitch is below.
+		</p>
 	</div>
 </header>
 
-<section>
-	<h2>What it does</h2>
-	<div class="flow"><b>install.sh</b> → model? → encrypt creds → confirm → <b>DESTROY</b> vault →
-hand off → agent asks to look around → <b>tunes config to your model</b> → offers a workflow</div>
-</section>
+<div class="wrap"><div class="divider"></div></div>
 
-<section>
-	<h2><span class="num">01</span> &nbsp; One-liner, then a wizard</h2>
-	<p style="color:var(--muted)">Clone-and-run or curl-piped. Either way you land in a four-question wizard: model, provider, key (or skip for OAuth), passphrase. That's it.</p>
-</section>
-
-<section>
-	<h2><span class="num">02</span> &nbsp; Privacy by construction</h2>
-	<ul>
-		<li>Your credential is <strong>encrypted</strong> (openssl aes-256-cbc · pbkdf2 · 600k iters) into a transient vault.</li>
-		<li>The vault is <strong>destroyed the moment the model is confirmed</strong>.</li>
-		<li>What persists: your own config + <code>auth.json</code> + skills/prompts/extensions. Nothing else.</li>
-		<li>The shipped tree contains <strong>zero</strong> hostnames, IPs, paths, or tokens from the author — <code>smoke/sanitize.sh</code> grep-enforces it.</li>
-	</ul>
-</section>
-
-<section>
-	<h2><span class="num">03</span> &nbsp; It tunes itself to your model</h2>
-	<p style="color:var(--muted)">apple-pi is model-agnostic by design. Once your model is confirmed, a <strong>self-improvement ritual</strong> reads the model's <em>real</em> capabilities from the catalog + request-shaping code — not from prose — and retunes thinking levels, compaction, and favourites to match.</p>
-</section>
-
-<section>
-	<h2><span class="num">04</span> &nbsp; Then keeps improving (autoresearch)</h2>
-	<p style="color:var(--muted)">An internal loop collects behavioral metrics daily and writes a weekly brief of proposed improvements. <strong>Nothing applies until you review it.</strong></p>
-	<div class="grid">
-		<div class="card"><h3>daily collect</h3><p>LLM-free telemetry from your session logs → a local SQLite store. Zero quota burn.</p></div>
-		<div class="card"><h3>weekly brief</h3><p>Deltas vs last week + deterministic proposals. Surfaces tool-discipline drift, compaction pressure, error rates.</p></div>
-		<div class="card"><h3>review → apply</h3><p><code>apple-pi review</code> shows the diff; <code>apple-pi apply --latest --yes</code> writes it. You gate every change.</p></div>
+<!-- ═══ THE PITCH ═══ -->
+<section id="what">
+	<div class="wrap">
+		<p class="eyebrow">What it is, plainly</p>
+		<h2>Most AI tools ask for your API key <span class="accent">and leave it sitting in a file forever.</span></h2>
+		<p class="lead">apple-pi does it differently. A guided wizard encrypts your key, makes one real call to
+			prove your model works, then <strong>destroys the key the instant it's confirmed</strong>. What you're
+			left with is a coding agent configured for <em>your</em> model, holding <em>your</em> keys, with a
+			self-improvement loop that <strong>never changes your config without your say-so</strong>.</p>
+		<p class="lead" style="margin-top:0.8rem;">It's a refined <strong>distribution</strong> of the open-source
+			<a href="https://pi.dev" style="color:var(--pink)">Pi Coding Agent</a> — the way a Linux distro wraps a
+			kernel. The engine is Pi's; apple-pi is the opinionated setup, the security model, and the methodology.</p>
 	</div>
 </section>
 
-<section>
-	<h2>In the box</h2>
-	<div class="grid">
-		<div class="card"><h3>persona</h3><p>senior-engineer + red/blue teamer contract, model-agnostic, loaded every session.</p></div>
-		<div class="card"><h3>8 skills</h3><p>plan-decompose · read-docs-first · verify-own-work · red-blue · long-horizon-compaction · self-assess · session-record · n8n-workflow-author</p></div>
-		<div class="card"><h3>4 prompts</h3><p>/decompose · /spec · /redteam · /design</p></div>
-		<div class="card"><h3>7 extensions</h3><p>sysinfo-guard (always on) + n8n / forgejo / netbird / llm / kanban / telegram — all env-configured, no baked endpoints.</p></div>
+<!-- ═══ THE FOUR PROVEN ADVANTAGES ═══ -->
+<section style="padding-top:1rem;">
+	<div class="wrap">
+		<p class="eyebrow">Why it's different</p>
+		<h2>Four things you don't usually get <span class="accent">in one install.</span></h2>
+		<div class="pillars">
+
+			<div class="pillar">
+				<span class="ico">🔐</span>
+				<h3>Onboarding that proves itself</h3>
+				<p>A <strong>required connection check</strong> means onboarding never "completes" with a broken
+					setup. Your key lives encrypted only during setup; the vault is erased the moment your model
+					answers. What's left is just your config and Pi's own auth store.</p>
+				<span class="tag">verified end-to-end</span>
+			</div>
+
+			<div class="pillar">
+				<span class="ico">🎯</span>
+				<h3>Tuned to your actual model</h3>
+				<p>No one-size-fits-all defaults. apple-pi reads your model's <strong>real capabilities</strong>
+					— context window, thinking format, cost — straight from the provider catalog and retunes its
+					config to match. Switch models, re-tune.</p>
+				<span class="tag">grounded in ground truth</span>
+			</div>
+
+			<div class="pillar">
+				<span class="ico">♻️</span>
+				<h3>Improves itself — safely</h3>
+				<p>A built-in loop (inspired by Karpathy's <em>autoresearch</em>) records how you actually use the
+					agent, writes a weekly brief of concrete improvements, and <strong>never applies a change until
+					you review it.</strong> Self-improvement without the risk.</p>
+				<span class="tag">you gate every change</span>
+			</div>
+
+			<div class="pillar">
+				<span class="ico">🏠</span>
+				<h3>Yours, not anyone's</h3>
+				<p>Bring any OpenAI- / Anthropic- / Google-compatible model, including <strong>local</strong>
+					(Ollama — no key, no cost). The shipped config contains <strong>zero</strong> of the author's
+					personal data — a sanitization test enforces it.</p>
+				<span class="tag">no lock-in, no leaks</span>
+			</div>
+
+		</div>
 	</div>
 </section>
+
+<!-- ═══ THE ONBOARDING LIFECYCLE ═══ -->
+<section id="how">
+	<div class="wrap">
+		<p class="eyebrow">How onboarding works</p>
+		<h2>Six steps. Your key exists <span class="accent">for two of them.</span></h2>
+		<p class="lead">The encrypted vault is created to seed your config and is destroyed as soon as the connection
+			is confirmed. After that, only Pi's standard auth store holds the key — exactly like a normal install,
+			but proven working.</p>
+
+		<div class="flow">
+			<div class="step"><div class="n">1</div><div class="t">Pick a model</div><div class="s">any name, any provider</div></div>
+			<div class="arrow">→</div>
+			<div class="step"><div class="n">2</div><div class="t">Get a key</div><div class="s">guided, offline help</div></div>
+			<div class="arrow">→</div>
+			<div class="step"><div class="n">3</div><div class="t">Encrypt it</div><div class="s">aes-256, in-memory</div></div>
+			<div class="arrow">→</div>
+			<div class="step"><div class="n">4</div><div class="t">Prove it works</div><div class="s">one live call</div></div>
+			<div class="arrow">→</div>
+			<div class="step destroy"><div class="n">5</div><div class="t">Erase the key</div><div class="s">vault destroyed</div></div>
+			<div class="arrow">→</div>
+			<div class="step"><div class="n">6</div><div class="t">Agent ready</div><div class="s">tuned to your model</div></div>
+		</div>
+		<p style="color:var(--dim); font-size:0.85rem; margin-top:1rem;">
+			Stuck on step 2? The built-in <strong>key guide</strong> walks you through getting a key for ten providers
+			(OpenAI, Anthropic, Google, DeepSeek, MiniMax, Mistral, Groq, OpenRouter, xAI, Ollama) — with pricing,
+			free tiers, and the errors you'll actually hit. Works with zero credentials.
+		</p>
+	</div>
+</section>
+
+<!-- ═══ WHY IT MATTERS (THE INNOVATION) ═══ -->
+<section>
+	<div class="wrap">
+		<p class="eyebrow">Why this matters</p>
+		<h2>The hard part of agents isn't the model — <span class="accent">it's everything around it.</span></h2>
+		<p class="lead">A frontier model with a leaky key file, a config that doesn't match it, and an improvement
+			loop that silently rewrites your settings is worse than useless. apple-pi makes opinionated,
+			<strong>provable</strong> choices on each — and that combination is the actual innovation:</p>
+
+		<div class="loop">
+			<div class="node">
+				<h4>Security as a first-class UX</h4>
+				<p>Not an afterthought config file. The transient-key lifecycle is the install flow itself.</p>
+			</div>
+			<div class="node">
+				<h4>Config grounded in ground truth</h4>
+				<p>The provider catalog, not vibes. Your settings reflect what your model can really do.</p>
+			</div>
+			<div class="node">
+				<h4>Methodology, not magic</h4>
+				<p>The persona encodes senior practice: spec before code, verify your own work, security review.</p>
+			</div>
+			<div class="node gate">
+				<h4>Human-gated self-improvement</h4>
+				<p>The agent improves — you stay in charge. Nothing writes itself without your <code>yes</code>.</p>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ═══ THE SELF-IMPROVEMENT LOOP ═══ -->
+<section>
+	<div class="wrap">
+		<p class="eyebrow">The self-improvement loop</p>
+		<h2>It watches how you work, <span class="accent">then asks before it changes anything.</span></h2>
+		<div class="loop">
+			<div class="node">
+				<h4>① collect (daily)</h4>
+				<p>Behavioral telemetry from your session logs → a local SQLite store. <strong>No LLM calls, zero quota burn.</strong></p>
+			</div>
+			<div class="node">
+				<h4>② brief (weekly)</h4>
+				<p>A diff vs. last week with concrete, reproducible change proposals — tool-use patterns, memory pressure, errors.</p>
+			</div>
+			<div class="node gate">
+				<h4>③ review → apply</h4>
+				<p><code>apple-pi review</code> shows the diff; <code>apply --latest --yes</code> writes it. <strong>You gate every change.</strong></p>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ═══ IN THE BOX ═══ -->
+<section>
+	<div class="wrap">
+		<p class="eyebrow">In the box</p>
+		<h2>Everything ships. <span class="accent">Nothing phones home.</span></h2>
+		<div class="proof">
+			<div class="stat"><div class="v">8</div><div class="l">methodology skills</div></div>
+			<div class="stat"><div class="v">4</div><div class="l">prompt templates</div></div>
+			<div class="stat"><div class="v">7</div><div class="l">tool extensions</div></div>
+			<div class="stat"><div class="v">10</div><div class="l">provider guides</div></div>
+			<div class="stat"><div class="v">0<span class="u">B</span></div><div class="l">tracked personal data</div></div>
+		</div>
+
+		<div class="box" style="margin-top:1.5rem;">
+			<div class="item">
+				<h3>The persona</h3>
+				<p>A senior-engineer + security-reviewer contract, loaded every session: read before you touch,
+					spec before you build, verify your own work, red/blue (find + fix the ways it breaks).</p>
+			</div>
+			<div class="item">
+				<h3>The skills</h3>
+				<p>Reusable methodologies, not prompts:</p>
+				<ul>
+					<li>plan-decompose · read-docs-first</li>
+					<li>verify-own-work · red-blue</li>
+					<li>self-assess · session-record</li>
+					<li>long-horizon-compaction · n8n-author</li>
+				</ul>
+			</div>
+			<div class="item">
+				<h3>The extensions</h3>
+				<p>Optional tools, all env-configured (no baked-in endpoints):</p>
+				<ul>
+					<li>sysinfo-guard (always on — blocks <code>rm -rf /</code>)</li>
+					<li>n8n · forgejo · netbird · llm-sidecar</li>
+					<li>kanban · telegram</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+</section>
+
+<div class="wrap"><div class="divider"></div></div>
 
 <footer>
-	<p>apple-pi is MIT-licensed and builds on the <a href="https://pi.dev">Pi Coding Agent</a>.<br>
-		Not affiliated with Apple Inc. "apple-pi" is a pie, not a product.</p>
+	<p>apple-pi is MIT-licensed and builds on the open-source <a href="https://pi.dev">Pi Coding Agent</a>.<br>
+		Not affiliated with Apple Inc. — "apple-pi" is a pie, not a product.</p>
 </footer>
 
 <script>
