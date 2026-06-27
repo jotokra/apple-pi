@@ -104,7 +104,35 @@
 	}
 	h2 .accent { color: var(--gold); }
 	p.lead { font-size: 1.08rem; color: var(--muted); max-width: 660px; }
+	ul.pitchpoints { list-style: none; padding: 0; margin: 1.4rem 0 0; max-width: 680px; }
+	ul.pitchpoints li {
+		position: relative; padding: 0.55rem 0 0.55rem 2rem; font-size: 1rem; color: var(--text);
+		border-top: 1px solid var(--card-brd);
+	}
+	ul.pitchpoints li:first-child { border-top: none; }
+	ul.pitchpoints li::before {
+		content: "✓"; position: absolute; left: 0; top: 0.55rem; color: var(--green);
+		font-weight: 800; font-size: 1rem;
+	}
+	ul.pitchpoints strong { color: var(--text); }
+	ul.pitchpoints code { font-family: var(--mono); color: var(--green); background: rgba(127,209,161,0.08); padding: 0.02rem 0.3rem; border-radius: 4px; }
 	.divider { height: 1px; background: linear-gradient(90deg, transparent, var(--card-brd), transparent); margin: 0; }
+
+	/* ── the three powers (immediate proof, high contrast) ─────────── */
+	.powers { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+	.power {
+		background: linear-gradient(160deg, rgba(255,246,235,0.06), rgba(255,246,235,0.02));
+		border: 1px solid var(--card-brd); border-radius: 14px; padding: 1.4rem 1.3rem;
+		transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+	}
+	.power:hover {
+		border-color: rgba(255,122,156,0.4); transform: translateY(-3px);
+		box-shadow: 0 14px 34px -16px rgba(232,93,126,0.5);
+	}
+	.power .pico { font-size: 1.8rem; display: block; margin-bottom: 0.5rem; }
+	.power h3 { margin: 0 0 0.45rem; font-size: 1.08rem; color: var(--gold); letter-spacing: -0.01em; }
+	.power p { margin: 0; font-size: 0.9rem; color: var(--muted); }
+	.power code { font-family: var(--mono); font-size: 0.84rem; color: var(--pink); background: rgba(255,122,156,0.08); padding: 0.05rem 0.32rem; border-radius: 4px; }
 
 	/* ── pillars (the four proven advantages) ──────────────────────── */
 	.pillars { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
@@ -190,9 +218,8 @@
 		<span class="badge">🥧 a distribution of the Pi Coding Agent · MIT · open source</span>
 		<div class="pie" aria-hidden="true">🥧</div>
 		<h1>apple-pi</h1>
-		<p class="lede">A <strong>self-tuning, privacy-first</strong> coding agent you actually own.
-			Bring any model — apple-pi guides you to a key, <strong>proves the connection works</strong>,
-			erases the key the moment it's confirmed, and tunes itself to your model's real strengths.</p>
+		<p class="lede">The coding agent that <strong>tunes itself to your model</strong>, <strong>improves itself</strong> from how you use it —
+			and <strong>never changes your config without your <code style="font-family:var(--mono);color:var(--green)">yes</code></strong>. Bring any key; it proves the connection, erases the key, and you're off.</p>
 
 		<div class="install" id="installbox">
 			<button class="copy" onclick="copyInstall()" aria-label="Copy install command">copy</button>
@@ -203,26 +230,47 @@
 			<a class="primary" href="https://github.com/jotokra/apple-pi">View on GitHub</a>
 			<a class="ghost" href="#how">See how it works</a>
 		</div>
-		<p style="color:var(--dim); font-size:0.82rem; margin-top:1.1rem;">
-			<em>"Delicious and warm. Better than other pi's."</em> — the personality stays; the pitch is below.
-		</p>
 	</div>
 </header>
+
+<!-- ═══ THE THREE POWERS (immediate, scannable) ═══ -->
+<section style="padding-top:1rem;padding-bottom:0;">
+	<div class="wrap">
+		<div class="powers">
+			<div class="power">
+				<span class="pico">🎙️</span>
+				<h3>talks & listens</h3>
+				<p><code>/voice</code> flips your session into speech — on-device, private. Type <em>or</em> talk, same conversation.</p>
+			</div>
+			<div class="power">
+				<span class="pico">🌐</span>
+				<h3>acts on the web</h3>
+				<p>Searches, reads pages, and drives <em>your</em> headed Chrome — click, type, fill forms. You watch every move.</p>
+			</div>
+			<div class="power">
+				<span class="pico">🔐</span>
+				<h3>holds your keys safely</h3>
+				<p>An encrypted, trace-free vault. Onboarding proves your key works, then destroys it — only your config remains.</p>
+			</div>
+		</div>
+	</div>
+</section>
 
 <div class="wrap"><div class="divider"></div></div>
 
 <!-- ═══ THE PITCH ═══ -->
 <section id="what">
 	<div class="wrap">
-		<p class="eyebrow">What it is, plainly</p>
-		<h2>Most AI tools ask for your API key <span class="accent">and leave it sitting in a file forever.</span></h2>
-		<p class="lead">apple-pi does it differently. A guided wizard encrypts your key, makes one real call to
-			prove your model works, then <strong>destroys the key the instant it's confirmed</strong>. What you're
-			left with is a coding agent configured for <em>your</em> model, holding <em>your</em> keys, with a
-			self-improvement loop that <strong>never changes your config without your say-so</strong>.</p>
-		<p class="lead" style="margin-top:0.8rem;">It's a refined <strong>distribution</strong> of the open-source
-			<a href="https://pi.dev" style="color:var(--pink)">Pi Coding Agent</a> — the way a Linux distro wraps a
-			kernel. The engine is Pi's; apple-pi is the opinionated setup, the security model, and the methodology.</p>
+		<p class="eyebrow">Why this, not another wrapper</p>
+		<h2>Other agents hand you a model. <span class="accent">This one runs itself.</span></h2>
+		<p class="lead">apple-pi is a refined <strong>distribution</strong> of the open-source
+			<a href="https://pi.dev" style="color:var(--pink)">Pi Coding Agent</a> — the way a Linux distro wraps a kernel.
+			The engine is Pi's. apple-pi adds the three things that turn a model into an <em>agent you can trust</em>:</p>
+		<ul class="pitchpoints">
+			<li><strong>It proves its own setup.</strong> Onboarding makes one real call to confirm your key works, then <strong>destroys the key</strong>. No stale secrets left in a file.</li>
+			<li><strong>It tunes itself to your model</strong> — reads the provider catalog (context window, thinking format, cost) and rewrites its config to match. Switch models, re-tune.</li>
+			<li><strong>It improves itself, safely.</strong> A loop watches how you work, writes a weekly brief of concrete changes, and <strong>never applies one without your <code>yes</code></strong>.</li>
+		</ul>
 	</div>
 </section>
 
