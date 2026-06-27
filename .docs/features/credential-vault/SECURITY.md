@@ -96,3 +96,38 @@ the vault path on identical primitives, so there's one crypto story to audit.
 A future **v2 vault format** can move to aes-256-gcm (authenticated) + a
 format-version bump; the versioned JSON envelope (SPEC §B) is there precisely
 so that migration is a `version: 1 → 2` re-encrypt, not a breaking change.
+
+---
+
+## Addendum — rotate / import / export (cv-rotate-import-export)
+
+The three convenience subcommands were added after the original R1–R8 pass.
+Their failure modes, mapped onto the existing model:
+
+- **`/vault export <id>` → auth.json.** This is the *deliberate* vault→auth
+  bridge (SPEC §D): it writes the entry's secret into `~/.pi/agent/auth.json`
+  in pi's native `{type:"api_key",key}` shape. **No net-new plaintext exposure**
+  — auth.json is pi's existing mode-0600 key store (populated today by `/login`),
+  and it always held plaintext keys. Moving a key vault→auth.json trades the
+  vault's encrypted-at-rest + not-in-logs guarantees for pi's native runtime
+  auth; it is a user-confirmed action (TUI confirm gate), and the secret is
+  never echoed — it transits memory→auth.json only. The bridge REFUSES to
+  clobber an existing non-`api_key` (OAuth) entry, so it can't silently destroy
+  a token-refresh state. → maps to A1's "/vault get gated" posture, ACCEPTED.
+- **`/vault import <file>` shred.** The source file is best-effort
+  overwritten-with-zeros + unlinked after import. **Honest caveat:** on
+  SSDs / APFS copy-on-write this is NOT a forensic guarantee (wear-leveling);
+  the real at-rest protection is FileVault (A4), not shred. The shred guards
+  against symlinks (refuses to follow — `openSync("r+")` + `unlinkSync` would
+  zero the TARGET while removing only the link → silent data loss of an
+  unrelated file). The CLI trusts the operator for the path (same posture as
+  `vault get` printing a secret); the TUI confirms before shred. → ACCEPTED.
+- **`/vault rotate <id>`.** Replaces an existing entry's secret via the same
+  encrypt/write path as `add` (new salt each write). Refuses if the entry does
+  not exist ("rotate" implies already-stored). **No new surface** beyond `add`.
+  → covered by R1–R8 unchanged.
+
+Re-read conclusion (R1–R8): every original failure mode is still mitigated or
+explicitly accepted; the three new subcommands introduce no new crypto, no new
+leak surface (export's plaintext hop is to pi's existing store, by design),
+and one new footgun (symlink shred) that is guarded. Gate item satisfied.
