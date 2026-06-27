@@ -22,6 +22,39 @@
 
 set -uo pipefail
 
+# ── bootstrap: if run from curl|sh (no repo alongside), clone + re-exec ─────────
+# The one-liner (`curl -fsSL <url>/install.sh | bash`) pipes this script with no
+# repo on disk. Detect that (config/ missing alongside) and clone+re-exec.
+# Bootstrap env: APPLEPI_REPO_URL (default github.com/jotokra/apple-pi),
+# APPLEPI_HOME (default ~/.apple-pi), APPLEPI_GIT_TOKEN (private repos),
+# APPLEPI_BRANCH (default main).
+_BS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+if [[ ! -d "$_BS_DIR/config" ]]; then
+	_bdie() { printf '\xc3\x97 apple-pi bootstrap: %s\n' "$*" >&2; exit 1; }
+	command -v git >/dev/null 2>&1 || _bdie "git is required for the one-liner install. Install it and re-run."
+	REPO_URL="${APPLEPI_REPO_URL:-https://github.com/jotokra/apple-pi}"
+	CLONE_TO="${APPLEPI_HOME:-$HOME/.apple-pi}"
+	BRANCH="${APPLEPI_BRANCH:-main}"
+	CLONE_URL="$REPO_URL"
+	if [[ -n "${APPLEPI_GIT_TOKEN:-}" ]]; then
+		CLONE_URL="${REPO_URL/:\/\//:\/\/${APPLEPI_GIT_TOKEN}@}"
+	fi
+	printf '\xf0\x9f\xa5\xa7 apple-pi — cloning %s (%s)\n' "$REPO_URL" "$BRANCH"
+	if [[ -d "$CLONE_TO/.git" ]]; then
+		git -C "$CLONE_TO" fetch --quiet origin "$BRANCH" \
+			&& git -C "$CLONE_TO" checkout --quiet "$BRANCH" \
+			&& git -C "$CLONE_TO" reset --quiet --hard "origin/$BRANCH" \
+			|| _bdie "git update of $CLONE_TO failed. Remove it (or set APPLEPI_HOME) and re-run."
+		printf '   updated %s\n' "$CLONE_TO"
+	else
+		git clone --quiet --branch "$BRANCH" "$CLONE_URL" "$CLONE_TO" \
+			|| _bdie "git clone failed. Private repo? set APPLEPI_GIT_TOKEN. Wrong URL? set APPLEPI_REPO_URL."
+		printf '   cloned to %s\n' "$CLONE_TO"
+	fi
+	# Re-exec the repo's install.sh. Scrub the token first so it can't leak into the wizard.
+	exec env -u APPLEPI_GIT_TOKEN bash "$CLONE_TO/install.sh" "$@"
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/_common.sh"

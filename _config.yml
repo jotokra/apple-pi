@@ -1,0 +1,9 @@
+# GitHub Pages config for the apple-pi landing page.
+# Serves docs/index.html at https://<user>.github.io/apple-pi/
+#
+# This file lives at the repo root. GitHub Actions uses it (see
+# .github/workflows/pages.yml) to publish the docs/ folder to Pages.
+# Set repo Settings → Pages → Source = "GitHub Actions".
+theme: jekyll-theme-primer   # unused when we publish static HTML directly; kept for compat
+title: apple-pi
+description: "Delicious and warm. Better than other pi's. A refined, self-tuning Pi Coding Agent distribution."

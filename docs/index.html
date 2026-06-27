@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>apple-pi — delicious and warm. Better than other pi's.</title>
+<meta name="description" content="A refined, self-tuning Pi Coding Agent distribution. You bring a model; apple-pi boots, destroys the bootstrap secrets, tunes itself to your model, and offers a workflow.">
+<style>
+	:root {
+		--bg: #0d1117; --card: #161b22; --border: #30363d; --text: #e6edf3;
+		--muted: #8b949e; --accent: #f0883e; --accent2: #d2a8ff; --green: #3fb950;
+		--mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+		--sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+	}
+	* { box-sizing: border-box; }
+	body {
+		margin: 0; background: var(--bg); color: var(--text);
+		font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased;
+	}
+	.hero {
+		max-width: 760px; margin: 0 auto; padding: 4.5rem 1.5rem 2rem; text-align: center;
+	}
+	.pie { font-size: 4rem; line-height: 1; margin-bottom: 0.5rem; }
+	h1 {
+		font-size: 2.4rem; margin: 0.5rem 0; letter-spacing: -0.02em; font-weight: 700;
+	}
+	.tagline {
+		font-size: 1.1rem; color: var(--muted); margin: 0 auto 1.75rem; max-width: 540px;
+	}
+	.tagline strong { color: var(--accent); font-weight: 600; }
+	.install {
+		background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+		padding: 1rem 1.25rem; margin: 1.5rem auto; max-width: 620px; text-align: left;
+		font-family: var(--mono); font-size: 0.86rem; position: relative; overflow-x: auto;
+	}
+	.install .prompt { color: var(--green); user-select: none; margin-right: 0.5rem; }
+	.install .cmd { color: var(--text); word-break: break-all; }
+	.copy {
+		position: absolute; top: 0.6rem; right: 0.6rem; background: var(--bg);
+		border: 1px solid var(--border); color: var(--muted); border-radius: 6px;
+		padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; font-family: var(--sans);
+	}
+	.copy:hover { color: var(--text); border-color: var(--muted); }
+	.ctas { margin: 1.5rem 0; }
+	.ctas a {
+		display: inline-block; margin: 0 0.4rem; padding: 0.6rem 1.2rem; border-radius: 8px;
+		text-decoration: none; font-weight: 600; font-size: 0.95rem; border: 1px solid var(--border);
+	}
+	.ctas .primary { background: var(--accent); color: #1a1108; border-color: var(--accent); }
+	.ctas .ghost { background: transparent; color: var(--text); }
+	section {
+		max-width: 760px; margin: 0 auto; padding: 1.5rem 1.5rem;
+	}
+	.grid {
+		display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+		gap: 1rem; margin-top: 1rem;
+	}
+	.card {
+		background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+		padding: 1.25rem;
+	}
+	.card h3 { margin: 0 0 0.4rem; font-size: 1rem; color: var(--accent2); }
+	.card p { margin: 0; font-size: 0.9rem; color: var(--muted); }
+	.flow {
+		font-family: var(--mono); font-size: 0.82rem; background: var(--card);
+		border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem;
+		overflow-x: auto; white-space: pre; color: var(--muted); margin-top: 1rem;
+	}
+	.flow b { color: var(--text); font-weight: 600; }
+	h2 { font-size: 1.4rem; margin: 2.5rem 0 0.5rem; letter-spacing: -0.01em; }
+	h2 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+	ul { padding-left: 1.2rem; color: var(--muted); }
+	ul li { margin-bottom: 0.3rem; }
+	ul li strong { color: var(--text); }
+	footer {
+		text-align: center; padding: 3rem 1.5rem 2rem; color: var(--muted); font-size: 0.85rem;
+	}
+	footer a { color: var(--accent2); text-decoration: none; }
+	@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="hero">
+	<div class="pie" aria-hidden="true">🥧</div>
+	<h1>apple-pi</h1>
+	<p class="tagline"><strong>Delicious and warm. Better than other pi's.</strong><br>
+		A refined, self-tuning distribution of the <a href="https://pi.dev" style="color:var(--accent2)">Pi Coding Agent</a>.
+		You bring a model; apple-pi boots, destroys the bootstrap secrets, tunes itself to your model, and offers a workflow.</p>
+
+	<div class="install" id="installbox">
+		<button class="copy" onclick="copyInstall()" aria-label="Copy install command">copy</button>
+		<span class="prompt">$</span><span class="cmd">curl -fsSL https://jotokra.github.io/apple-pi/install.sh | bash</span>
+	</div>
+
+	<div class="ctas">
+		<a class="primary" href="https://github.com/jotokra/apple-pi">View on GitHub</a>
+		<a class="ghost" href="https://github.com/jotokra/apple-pi#readme">Read the docs</a>
+	</div>
+</header>
+
+<section>
+	<h2>What it does</h2>
+	<div class="flow"><b>install.sh</b> → model? → encrypt creds → confirm → <b>DESTROY</b> vault →
+hand off → agent asks to look around → <b>tunes config to your model</b> → offers a workflow</div>
+</section>
+
+<section>
+	<h2><span class="num">01</span> &nbsp; One-liner, then a wizard</h2>
+	<p style="color:var(--muted)">Clone-and-run or curl-piped. Either way you land in a four-question wizard: model, provider, key (or skip for OAuth), passphrase. That's it.</p>
+</section>
+
+<section>
+	<h2><span class="num">02</span> &nbsp; Privacy by construction</h2>
+	<ul>
+		<li>Your credential is <strong>encrypted</strong> (openssl aes-256-cbc · pbkdf2 · 600k iters) into a transient vault.</li>
+		<li>The vault is <strong>destroyed the moment the model is confirmed</strong>.</li>
+		<li>What persists: your own config + <code>auth.json</code> + skills/prompts/extensions. Nothing else.</li>
+		<li>The shipped tree contains <strong>zero</strong> hostnames, IPs, paths, or tokens from the author — <code>smoke/sanitize.sh</code> grep-enforces it.</li>
+	</ul>
+</section>
+
+<section>
+	<h2><span class="num">03</span> &nbsp; It tunes itself to your model</h2>
+	<p style="color:var(--muted)">apple-pi is model-agnostic by design. Once your model is confirmed, a <strong>self-improvement ritual</strong> reads the model's <em>real</em> capabilities from the catalog + request-shaping code — not from prose — and retunes thinking levels, compaction, and favourites to match.</p>
+</section>
+
+<section>
+	<h2><span class="num">04</span> &nbsp; Then keeps improving (autoresearch)</h2>
+	<p style="color:var(--muted)">An internal loop collects behavioral metrics daily and writes a weekly brief of proposed improvements. <strong>Nothing applies until you review it.</strong></p>
+	<div class="grid">
+		<div class="card"><h3>daily collect</h3><p>LLM-free telemetry from your session logs → a local SQLite store. Zero quota burn.</p></div>
+		<div class="card"><h3>weekly brief</h3><p>Deltas vs last week + deterministic proposals. Surfaces tool-discipline drift, compaction pressure, error rates.</p></div>
+		<div class="card"><h3>review → apply</h3><p><code>apple-pi review</code> shows the diff; <code>apple-pi apply --latest --yes</code> writes it. You gate every change.</p></div>
+	</div>
+</section>
+
+<section>
+	<h2>In the box</h2>
+	<div class="grid">
+		<div class="card"><h3>persona</h3><p>senior-engineer + red/blue teamer contract, model-agnostic, loaded every session.</p></div>
+		<div class="card"><h3>8 skills</h3><p>plan-decompose · read-docs-first · verify-own-work · red-blue · long-horizon-compaction · self-assess · session-record · n8n-workflow-author</p></div>
+		<div class="card"><h3>4 prompts</h3><p>/decompose · /spec · /redteam · /design</p></div>
+		<div class="card"><h3>7 extensions</h3><p>sysinfo-guard (always on) + n8n / forgejo / netbird / llm / kanban / telegram — all env-configured, no baked endpoints.</p></div>
+	</div>
+</section>
+
+<footer>
+	<p>apple-pi is MIT-licensed and builds on the <a href="https://pi.dev">Pi Coding Agent</a>.<br>
+		Not affiliated with Apple Inc. "apple-pi" is a pie, not a product.</p>
+</footer>
+
+<script>
+	function copyInstall() {
+		const text = 'curl -fsSL https://jotokra.github.io/apple-pi/install.sh | bash';
+		navigator.clipboard.writeText(text).then(function () {
+			const btn = document.querySelector('.copy');
+			const old = btn.textContent;
+			btn.textContent = 'copied!';
+			setTimeout(function () { btn.textContent = old; }, 1400);
+		});
+	}
+</script>
+</body>
+</html>
