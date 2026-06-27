@@ -28,6 +28,30 @@ const { open, todayLocal, isoNow, piDir } = require("./lib/db");
 
 const SESSIONS_DIR = `${piDir()}/sessions`;
 
+// REQ-CV-6 — credential-vault safety. The collector must NEVER read secret
+// material, now or via future changes. This denylist + the guard in
+// readSessionFile() enforce it: if any path resolved here matches a denied
+// pattern, the read is refused with an error (and smoke/vault-tracefree.sh
+// re-asserts no vault path appears in the collected DB). The vault itself lives
+// at agent/credentials.vault; sessions/ is a different tree, so this is defense
+// in depth against a future glob widening.
+const DENYLIST_PATTERNS = [
+	/credentials\.vault(\.|$)/i,   // the persistent credential vault
+	/onboarding\.vault(\.|$)/i,    // the legacy transient onboarding vault
+	/auth\.json$/i,                // Pi's own auth store (already excluded by scope, but explicit)
+	/\.ssh\//i, /\.aws\//i, /\.kube\//i,  // standard secret dirs
+];
+function isDenied(p) {
+	return DENYLIST_PATTERNS.some((re) => re.test(p));
+}
+// Guarded read: refuse denied paths. Used for ALL file reads in this collector.
+function readSessionFile(fullPath) {
+	if (isDenied(fullPath)) {
+		throw new Error(`collect-metrics: refusing to read denied path (credential/secret material): ${fullPath}`);
+	}
+	return readFileSync(fullPath, "utf8");
+}
+
 function parseArgs(argv) {
 	const out = { date: null, all: false, dry: false };
 	for (let i = 2; i < argv.length; i++) {
@@ -62,7 +86,7 @@ function collectAllDays() {
 	for (const f of files) {
 		const full = path.join(SESSIONS_DIR, f);
 		let lines;
-		try { lines = readFileSync(full, "utf8").split("\n"); } catch { continue; }
+		try { lines = readSessionFile(full).split("\n"); } catch { continue; }
 		let touchedThisFile = false;
 		for (const line of lines) {
 			if (!line.trim()) continue;
@@ -111,7 +135,7 @@ function collectAllDays() {
 	const fileDays = new Map();
 	for (const f of files) {
 		let lines;
-		try { lines = readFileSync(path.join(SESSIONS_DIR, f), "utf8").split("\n"); } catch { continue; }
+		try { lines = readSessionFile(path.join(SESSIONS_DIR, f)).split("\n"); } catch { continue; }
 		const days = new Set();
 		for (const line of lines) {
 			if (!line.trim()) continue;
@@ -193,4 +217,13 @@ function main() {
 	console.log(`collect-metrics: wrote ${written} run row(s) to ${require("./lib/db").dbPath()}`);
 }
 
-main();
+// CLI entry — guarded so the module is require()-able for the REQ-CV-6 smoke
+// test (which asserts isDenied() without triggering a real collection run
+// against the live PI dir).
+if (require.main === module) {
+	main();
+}
+
+// Test-only exports (REQ-CV-6). Not part of the CLI surface; the smoke test
+// requires this module to assert the denylist guard fires on credential paths.
+module.exports = { isDenied, readSessionFile };
