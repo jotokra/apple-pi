@@ -39,6 +39,11 @@ for ph in __APPLEPI_PROVIDER__ __APPLEPI_MODEL__ __APPLEPI_EXT_SYSINFO__ \
 done
 ok "all placeholders present"
 
+header "template is marked as internal seed scaffolding"
+grep -q '"_applepi_seed": true' config/agent/settings.json.template \
+	|| { fail "settings.json.template missing _applepi_seed marker"; exit 1; }
+ok "seed marker present (P3 will strip it per REQ-3-5)"
+
 header "skill frontmatter parses (name + description)"
 for s in config/skills/*/SKILL.md; do
 	head -5 "$s" | grep -q '^name:' || { fail "$s missing name frontmatter"; exit 1; }

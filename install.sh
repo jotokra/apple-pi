@@ -8,10 +8,9 @@
 #                P4 integrated, P5 workflow-offer
 #
 # Flags:
-#   --purge-auth-too   Also delete ~/.pi/agent/auth.json at purge (strict reading;
-#                      default keeps it because Pi can't run without runtime auth).
-#   --purge-config     Also delete the onboarding settings.json at purge (P3 rebuilds
-#                      it from scratch). Default keeps it as the seed P3 retunes.
+#   --purge-auth-too   Also delete ~/.pi/agent/auth.json at purge (opt-in; off by
+#                      default — Pi needs runtime auth, and the user keeps their own
+#                      config + auth.json after onboarding).
 #   --sandbox <dir>    Use <dir> as PI_CODING_AGENT_DIR (for testing; never touches ~/.pi).
 #   --no-handoff       Stop after P1+purge; print the handoff command instead of exec'ing.
 #   --skip-confirm     Skip the live model-confirm call (for air-gapped / OAuth flows).
@@ -28,7 +27,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/_common.sh"
 
 PURGE_AUTH_TOO=0
-PURGE_CONFIG=0
 SANDBOX=""
 NO_HANDOFF=0
 SKIP_CONFIRM=0
@@ -36,7 +34,6 @@ SKIP_CONFIRM=0
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		--purge-auth-too) PURGE_AUTH_TOO=1; shift ;;
-		--purge-config)   PURGE_CONFIG=1;   shift ;;
 		--sandbox)        SANDBOX="$2";     shift 2 ;;
 		--no-handoff)     NO_HANDOFF=1;     shift ;;
 		--skip-confirm)   SKIP_CONFIRM=1;   shift ;;
@@ -301,18 +298,17 @@ header "P1 · purge bootstrap secrets"
 if [[ "$CONFIRMED" == 1 ]]; then
 	secure_shred "$VAULT"
 	rm -rf "$SCRATCH"
-	ok "destroyed: onboarding.vault + scratch dir"
-	if [[ "$PURGE_CONFIG" == 1 ]]; then
-		rm -f "$SETTINGS_OUT"
-		ok "destroyed: onboarding settings.json (P3 will rebuild from scratch)"
-	else
-		info "kept settings.json as the seed P3 will retune (use --purge-config to delete it)"
-	fi
+	ok "destroyed: onboarding.vault + scratch dir (encrypted creds gone)"
+	# settings.json is the INTERNAL SEED (marked _applepi_seed=true). It is NOT yet the
+	# user's config — P3 rewrites it clean (strips the seed marker + every _comment field,
+	# retunes to the model). We keep it as the seed because Pi needs a settings.json to
+	# run P3 at all. After P3, what remains is the user's own config, not an apple-pi artifact.
+	info "kept settings.json as the internal seed (P3 will rewrite it into the user's clean config)"
 	if [[ "$PURGE_AUTH_TOO" == 1 ]]; then
 		secure_shred "$AUTH_OUT"
 		ok "destroyed: auth.json (--purge-auth-too). Re-authorise via /login after handoff."
 	else
-		info "kept auth.json (Pi's runtime auth store; D1). Use --purge-auth-too to also remove it."
+		info "kept auth.json (the user's runtime auth; lives alongside the tuned config)."
 	fi
 else
 	die "model not confirmed; bootstrap secrets RETAINED for retry. Re-run when ready."

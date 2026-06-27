@@ -103,9 +103,15 @@ the *agent* recognizes the model, not a hardcoded menu.
 - **REQ-1-5** A single confirmation call is made
   (`pi -p "Reply with the single word OK." --no-tools`). Non-`OK`/error
   → the user is offered retry or abort. No purge on failure.
-- **REQ-1-6** On confirm: the vault, onboarding scratch dir, and the
-  onboarding-phase `settings.json` are deleted (`rm -P` where supported).
-  `auth.json` PERSISTS by default; `--purge-auth-too` removes it too.
+- **REQ-1-6** On confirm: the vault and the onboarding scratch dir are
+  deleted (`rm -P` / shred where supported). The seed `settings.json` is
+  **retained as internal scaffolding** (it carries `"_applepi_seed": true`)
+  because Pi needs it to run P3 at all — but it is NOT the user's config
+  yet. P3 rewrites it into the user's clean config (REQ-3-5). The encrypted
+  credential is gone at this point; only `auth.json` (Pi's runtime store)
+  holds the key.
+  `auth.json` PERSISTS (the user's runtime auth); `--purge-auth-too` is
+  the opt-in that also removes it.
 - **REQ-1-7** The script then hands off to a Pi agent session that reads
   `lib/handoff.md` to drive phases P2–P5.
 
@@ -138,6 +144,14 @@ the *agent* recognizes the model, not a hardcoded menu.
   runnable models, dead config removed).
 - **REQ-3-4** A decisions doc is written to
   `~/.pi/agent/self-assessment-<date>.md` (audit trail).
+- **REQ-3-5** **The agent rewrites `settings.json` into the USER'S CLEAN
+  CONFIG** — strips the `_applepi_seed` marker and every `_comment` /
+  `_*_comment` field, keeps only real Pi keys tuned to the model. After
+  this, `~/.pi/agent/settings.json` reads like the user wrote it for
+  their model; nothing betrays that apple-pi authored it. This is the
+  second half of D1: the internal onboarding config is wiped (by
+  transformation), the user is left with their own config living
+  alongside `auth.json`.
 
 ### P4 — Integrated
 
@@ -163,7 +177,7 @@ the *agent* recognizes the model, not a hardcoded menu.
 
 | ID | Decision | Rationale |
 |----|----------|-----------|
-| D1 | `auth.json` persists past purge; `--purge-auth-too` for the strict reading | Pi cannot run without runtime auth. The vault is the redundant bootstrap copy; deleting it satisfies "delete the encrypted file." `auth.json` is Pi's own store, managed via `/login`. Surfaced for user confirmation. |
+| D1 | Two-phase config lifecycle. During onboarding (until model confirmed + P3 tunes), apple-pi uses an INTERNAL seed config (`settings.json` carrying `_applepi_seed: true`) — scaffolding, not the user's config. On model confirm the encrypted vault is deleted and the scratch wiped; the seed is **retained only so P3 can run**. P3 then **rewrites `settings.json` into the user's clean config** (strips the seed marker + every `_comment` field, tunes to the model) — the internal onboarding config is wiped by transformation. What persists is the user's own config + `auth.json` + skills/prompts/extensions. `auth.json` is kept (runtime auth); `--purge-auth-too` opts into removing it too. | The user's intent: "wipe the internal onboarding/agentic-guidance config once the model is set up; the user is left with only their own config alongside auth.json." Deleting `settings.json` outright is wrong — Pi needs it to run P3, and the user needs a tuned config afterward. Rewriting it clean satisfies both "wipe the scaffolding" and "user keeps their own config." (Revised from the original v1.0.0 D1 after user clarification 2026-06-27.) |
 | D2 | `openssl enc -aes-256-cbc -pbkdf2 -iter 600000` for the vault | Zero deps on macOS/Linux. The vault is transient (deleted within minutes of creation), so this is defense-in-depth during bootstrap, not long-term storage. `age` is a documented future option. |
 | D3 | Build at `~/Projects/apple-pi/`, remote prepped for GitHub | User said "github repo." Remote set with a placeholder username; push is a one-liner. LAN-forgejo option noted. |
 | D4 | Bash bootstraps; agent does recognition + tuning | Makes "any input accepted" genuine — a hardcoded model menu would contradict it. |

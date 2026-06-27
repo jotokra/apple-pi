@@ -35,15 +35,21 @@ count=$(find "$SANDBOX/skills" -name SKILL.md | wc -l | tr -d ' ')
 [[ "$count" -eq 8 ]] || { fail "expected 8 skills copied, got $count"; exit 1; }
 ok "8 skills + prompts + extensions copied"
 
-header "settings.json rendered (model, not purged)"
+header "settings.json rendered (internal seed; carries _applepi_seed marker)"
 SETTINGS="$SANDBOX/agent/settings.json"
 [[ -f "$SETTINGS" ]] || { fail "missing $SETTINGS"; exit 1; }
 if command -v jq >/dev/null 2>&1; then
 	jq -e '.defaultModel == "sandbox-model"' "$SETTINGS" >/dev/null || { fail "defaultModel not set"; exit 1; }
+	jq -e '._applepi_seed == true' "$SETTINGS" >/dev/null \
+		|| { fail "rendered seed missing _applepi_seed marker (D1 contract)"; exit 1; }
 elif command -v node >/dev/null 2>&1; then
-	node -e "const s=JSON.parse(require('fs').readFileSync('$SETTINGS','utf8'));if(s.defaultModel!=='sandbox-model')process.exit(1)" || { fail "defaultModel not set"; exit 1; }
+	node -e "const s=JSON.parse(require('fs').readFileSync('$SETTINGS','utf8'));if(s.defaultModel!=='sandbox-model'||s._applepi_seed!==true)process.exit(1)" \
+		|| { fail "defaultModel or _applepi_seed marker wrong"; exit 1; }
 fi
-ok "settings.json defaultModel=sandbox-model"
+ok "settings.json = internal seed (defaultModel + _applepi_seed); P3 rewrites it clean"
+
+info "NOTE: the clean-user-config state (no _applepi_seed, no _comment) is P3's job"
+info "      and needs a live model run; the sandbox only proves the seed is correct."
 
 header "auth.json seeded + 0600"
 AUTH="$SANDBOX/agent/auth.json"
