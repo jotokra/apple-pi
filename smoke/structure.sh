@@ -30,13 +30,19 @@ count=$(find config/prompts -type f -name '*.md' | wc -l | tr -d ' ')
 [[ "$count" -eq 4 ]] || { fail "expected 4 prompts, got $count"; exit 1; }
 ok "4 prompts"
 
-header "extensions (8 .ts)"
-count=$(find config/extensions -type f -name '*.ts' | wc -l | tr -d ' ')
-[[ "$count" -eq 8 ]] || { fail "expected 8 extensions, got $count"; exit 1; }
-ok "8 extensions"
+header "extensions (8 single-file .ts)"
+count=$(find config/extensions -maxdepth 1 -type f -name '*.ts' | wc -l | tr -d ' ')
+[[ "$count" -eq 8 ]] || { fail "expected 8 single-file extensions, got $count"; exit 1; }
+ok "8 single-file extensions"
+
+header "web bundle present"
+[[ -f config/extensions/web/index.ts ]] || { fail "missing config/extensions/web/index.ts"; exit 1; }
+node -e "const p=JSON.parse(require('fs').readFileSync('config/extensions/web/package.json','utf8')); if(!(p.pi&&Array.isArray(p.pi.extensions)&&p.pi.extensions[0]==='./index.ts')) throw 0" 2>/dev/null \
+	|| { fail "config/extensions/web/package.json missing pi.extensions manifest -> ./index.ts"; exit 1; }
+ok "web bundle (index.ts + valid package.json manifest)"
 
 header "settings.json.template placeholders"
-for ph in __APPLEPI_PROVIDER__ __APPLEPI_MODEL__ __APPLEPI_EXT_SYSINFO__ \
+for ph in __APPLEPI_PROVIDER__ __APPLEPI_MODEL__ __APPLEPI_EXT_SYSINFO__ __APPLEPI_EXT_WEB__ \
 		__APPLEPI_SKILLS_DIR__ __APPLEPI_PROMPTS_DIR__ __APPLEPI_SHELL__ \
 		__APPLEPI_SESSIONS_DIR__; do
 	grep -q "$ph" config/agent/settings.json.template || { fail "missing placeholder $ph"; exit 1; }
@@ -60,6 +66,7 @@ TMP="$(mktemp -d)"
 sed -e 's#__APPLEPI_PROVIDER__#openai#' \
 	-e 's#__APPLEPI_MODEL__#gpt-test#' \
 	-e 's#__APPLEPI_EXT_SYSINFO__#/tmp/x.ts#' \
+	-e 's#__APPLEPI_EXT_WEB__#/tmp/web#' \
 	-e 's#__APPLEPI_SKILLS_DIR__#/tmp/skills#' \
 	-e 's#__APPLEPI_PROMPTS_DIR__#/tmp/prompts#' \
 	-e 's#__APPLEPI_SHELL__#/bin/zsh#' \
