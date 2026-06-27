@@ -108,7 +108,7 @@ const getCard = defineTool({
 const createCard = defineTool({
 	name: "kanban_create_card",
 	label: "Kanban Create Card",
-	description: "Create a new task in the 'triage' lane. Requires the table to have id/title/body/status/priority/assignee/created_by/created_at columns."
+	description: "Create a new task in the 'triage' lane. Requires the table to have id/title/body/status/priority/assignee/created_by/created_at columns.",
 	parameters: Type.Object({
 		title: Type.String({ description: "Task title" }),
 		body: Type.String({ description: "Task body (markdown)" }),
