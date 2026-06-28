@@ -1,0 +1,10 @@
+#!/bin/sh
+# sync/hook/pre-commit — installed into the config repo's hooksPath.
+#
+# One-line shim: all logic lives in `apple-pi sync hook-run` (which calls
+# sync/lib/hookrun.js → sync/lib/paths.js). This keeps the classification
+# authority in ONE place; the hook itself never re-derives path classes.
+#
+# Portable: sh + `apple-pi` on PATH. (apple-pi is present wherever this
+# feature is used — `sync clone` itself is an apple-pi command.)
+exec apple-pi sync hook-run "$@"
