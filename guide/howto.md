@@ -29,7 +29,7 @@ records), or a **monitoring** health checker.
 ## [Use voice mode](https://github.com/jotokra/apple-pi/blob/main/docs/HOWTO.md#use-voice-mode)
 
 Speak a prompt, hear the reply, fully on-device (whisper.cpp STT, `say`
-TTS). `/voice` or `Ctrl+V`; type ⇄ talk is the same conversation.
+TTS). `/voice` or `Ctrl+Shift+V`; type ⇄ talk is the same conversation.
 
 ## [Keep apple-pi current](https://github.com/jotokra/apple-pi/blob/main/docs/HOWTO.md#keep-apple-pi-current)
 

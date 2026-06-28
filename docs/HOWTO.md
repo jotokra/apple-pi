@@ -188,7 +188,7 @@ curl -L -o ~/.pi/voice/models/ggml-small-en.bin \
 
 | Action | Key |
 |---|---|
-| Start voice mode | `/voice` or **Ctrl+V** |
+| Start voice mode | `/voice` or **Ctrl+Shift+V** |
 | Quit voice mode | `q` or Ctrl-C |
 
 Voice turns append to the **same** session JSONL — type ⇄ talk is the same
