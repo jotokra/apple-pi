@@ -74,6 +74,14 @@ function resolveEnvFrom(envFrom: any): { env: Record<string, string>, missing: s
 export default function (pi: ExtensionAPI) {
 	const clients: any[] = [];   // for session_shutdown cleanup
 
+	// Co-register the /sources command (same extension dir). Optional — if
+	// sources.ts is missing or fails, the bridge still loads its tools.
+	try {
+		const mod = require(join(__dirname, "sources.ts"));
+		const fn = (mod && mod.default) ? mod.default : mod;
+		if (typeof fn === "function") fn(pi);
+	} catch { /* sources.ts optional */ }
+
 	pi.on("session_start", async (_event, ctx) => {
 		const settings = readSettings();
 		const trusted = new Set<string>(Array.isArray(settings.mcp?.trustedServers) ? settings.mcp.trustedServers : []);
