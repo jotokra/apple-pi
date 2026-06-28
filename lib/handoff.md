@@ -100,7 +100,7 @@ Announce, briefly and concretely:
 
 You also have three **default-on** capabilities (no setup needed):
 
-- **Voice mode** — `/voice` (or Ctrl+V) flips the session into pivoice
+- **Voice mode** — `/voice` (or Ctrl+Shift+V) flips the session into pivoice
   (on-device whisper.cpp + `say`). Same conversation: voice turns append to
   the session JSONL, `pi -c` resumes. *If onboarding didn't enable voice*
   (user declined the model download), tell them the one command to enable

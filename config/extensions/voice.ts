@@ -1,7 +1,7 @@
 /**
  * voice.ts — apple-pi voice-mode bridge.
  *
- * Registers `/voice` (+ Ctrl+V) so you can flip the ongoing pi TUI session
+ * Registers `/voice` (+ Ctrl+Shift+V) so you can flip the ongoing pi TUI session
  * into pivoice: same conversation, voice turns append to the same session
  * JSONL, and you resume the TUI with `pi -c` when done.
  *
@@ -100,8 +100,10 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	// Ctrl+V shortcut — same as /voice (TUI only).
-	pi.registerShortcut("ctrl+v", {
+	// Ctrl+Shift+V shortcut — same as /voice (TUI only). Uses Ctrl+Shift+V (not
+	// Ctrl+V) because Ctrl+V is pi's built-in app.clipboard.pasteImage binding;
+	// shadowing it would silently break image paste from the clipboard.
+	pi.registerShortcut("ctrl+shift+v", {
 		description: "Enter voice mode (pivoice) on the current session",
 		handler: async (_event, ctx) => {
 			if (ctx.mode !== "tui") return;

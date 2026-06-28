@@ -18,7 +18,7 @@ A few things worth knowing on day one:
   don't need to memorize commands — describe the work.
 - **`/vault`** manages keys. `add`, `rotate`, `list`, `export`, `lock`. The
   entry prompt is masked; secrets never print without an explicit reveal.
-- **`Ctrl+P`** cycles models. **`Ctrl+V`** (or `/voice`) flips the session
+- **`Ctrl+P`** cycles models. **`Ctrl+Shift+V`** (or `/voice`) flips the session
   to voice mode.
 - **`/branch`** checkpoints a plan; **`/tree`** navigates sessions. Pi
   sessions are tree-structured and shareable.
@@ -32,7 +32,7 @@ A few things worth knowing on day one:
 | `pi --model <id>` | start on a specific model |
 | `pi --list-models <query>` | fuzzy-search available models |
 | `/vault add\|list\|rotate\|export\|lock` | manage keys |
-| `/voice` or `Ctrl+V` | voice mode (type ⇄ talk) |
+| `/voice` or `Ctrl+Shift+V` | voice mode (type ⇄ talk) |
 | `/branch`, `/tree` | checkpoint + navigate sessions |
 | `apple-pi update --check` | check for a new release (read-only) |
 | `apple-pi review` | review the weekly self-improvement brief |

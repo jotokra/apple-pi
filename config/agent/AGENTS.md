@@ -184,7 +184,7 @@ extensions need no credentials; **on-demand** ones need env/config:
   type, check, fill forms, screenshot, tabs. Headed by default = the
   transparency guardrail; **confirm before any payment / deletion /
   irreversible action.** No secrets; provider keys optional via env.
-- `voice.ts` — **voice mode bridge.** `/voice` (or Ctrl+V) flips the active
+- `voice.ts` — **voice mode bridge.** `/voice` (or Ctrl+Shift+V) flips the active
   session into `pivoice` (on-device whisper.cpp + `say`); voice turns append
   to the same JSONL, `pi -c` resumes. TUI-only.
 

@@ -76,7 +76,7 @@ fi
 echo
 echo "${C_BOLD}Enable voice mode?${C_OFF}"
 echo "  Installs: ffmpeg + whisper-cpp (Homebrew) and a ~465MB whisper model."
-echo "  Lets you type ${C_DIM}/${C_OFF}voice${C_DIM} (or Ctrl+V) to talk to the agent.${C_OFF}"
+echo "  Lets you type ${C_DIM}/${C_OFF}voice${C_DIM} (or Ctrl+Shift+V) to talk to the agent.${C_OFF}"
 echo "  On-device, private (whisper.cpp + macOS 'say')."
 echo
 
@@ -127,7 +127,7 @@ echo "${C_BOLD}Voice mode status:${C_OFF}"
 echo
 if [[ $(command -v python3 >/dev/null 2>&1; echo $?) -eq 0 && $(command -v ffmpeg >/dev/null 2>&1; echo $?) -eq 0 \
 	&& $(command -v whisper-cli >/dev/null 2>&1; echo $?) -eq 0 && -f "$MODEL_PATH" ]]; then
-	ok "${C_BOLD}Voice ready.${C_OFF} Type ${C_DIM}/voice${C_OFF} (or Ctrl+V) in any pi session."
+	ok "${C_BOLD}Voice ready.${C_OFF} Type ${C_DIM}/voice${C_OFF} (or Ctrl+Shift+V) in any pi session."
 else
 	warn "Some deps missing — finish them, then /voice will work."
 fi
