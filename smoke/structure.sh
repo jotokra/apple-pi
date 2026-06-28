@@ -108,6 +108,13 @@ for j in lifecycle/collect-metrics.js lifecycle/aggregate-week.js lifecycle/appl
 done
 ok "lifecycle + CLI + vault node syntax clean"
 
+header "ingress node + shell syntax"
+bash -n ingress/schedule.sh || { fail "ingress/schedule.sh syntax"; exit 1; }
+for j in ingress/lib/poller.js ingress/lib/state.js ingress/lib/inject.js; do
+	node --check "$j" || { fail "$j syntax"; exit 1; }
+done
+ok "ingress node + shell syntax clean"
+
 header "mcp-bridge schema + node syntax"
 for j in mcp-bridge/lib/mcp-client.js mcp-bridge/lib/schema.js mcp-bridge/test/fake-server.js; do
 	[[ -f "$j" ]] || { fail "missing $j"; exit 1; }
