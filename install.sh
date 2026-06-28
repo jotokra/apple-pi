@@ -327,6 +327,16 @@ if [[ -d "$REPO_DIR/mcp-bridge" ]]; then
 	ok "copied mcp-bridge → $PI_DIR/extensions/mcp-bridge (opt-in: add mcp.servers to enable)"
 fi
 
+# ingress extension — pollers that watch sources (RSS/webdiff/json) and inject
+# new items into a session, wrapped with the UNTRUSTED marker. Copy into the
+# pi-dir extensions tree so pi auto-discovers it. No-op until the user adds
+# ingress.pollers via /ingress add.
+if [[ -d "$REPO_DIR/ingress" ]]; then
+	rm -rf "$PI_DIR/extensions/ingress"
+	cp -R "$REPO_DIR/ingress" "$PI_DIR/extensions/ingress" || die "failed to copy ingress"
+	ok "copied ingress → $PI_DIR/extensions/ingress (opt-in: /ingress add <kind> <name> <url>)"
+fi
+
 # Voice bundle ships as a pi package (pivoice.py + bin + manifest). The bundle
 # is always copied (cheap; makes /voice + Ctrl+Shift+V exist). The heavy deps
 # (brew packages + ~465MB model) are OPT-IN: one yorn prompt calls the
