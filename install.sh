@@ -317,6 +317,16 @@ _install_tree skills
 _install_tree prompts
 _install_tree extensions
 
+# mcp-bridge ships at the repo root (a multi-file TS extension: index.ts + lib/
+# + test/). Copy it into the pi-dir extensions tree so pi auto-discovers it
+# (the same way sysinfo/voice/web load). No-op until the user adds mcp.servers
+# to their settings — the bridge waits for servers to bridge.
+if [[ -d "$REPO_DIR/mcp-bridge" ]]; then
+	rm -rf "$PI_DIR/extensions/mcp-bridge"
+	cp -R "$REPO_DIR/mcp-bridge" "$PI_DIR/extensions/mcp-bridge" || die "failed to copy mcp-bridge"
+	ok "copied mcp-bridge → $PI_DIR/extensions/mcp-bridge (opt-in: add mcp.servers to enable)"
+fi
+
 # Voice bundle ships as a pi package (pivoice.py + bin + manifest). The bundle
 # is always copied (cheap; makes /voice + Ctrl+Shift+V exist). The heavy deps
 # (brew packages + ~465MB model) are OPT-IN: one yorn prompt calls the
