@@ -18,10 +18,21 @@
  * Note: changes require a /reload (or new session) to take effect — the bridge
  * reads settings in session_start. The command says so.
  */
+import { createRequire } from "node:module";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const require = createRequire(import.meta.url);
+// thisFile = the absolute path of sources.ts (works under jiti + bundlers)
+const thisFile = (() => {
+	try { return fileURLToPath(import.meta.url); }
+	catch { return typeof __dirname !== "undefined" ? __dirname + "/sources.ts" : process.cwd() + "/sources.ts"; }
+})();
+const HERE = dirname(thisFile);   // .../mcp-bridge
+const OPENAPI_SERVER = join(HERE, "lib", "openapi-server.js");
 
 function settingsPath(): string {
 	const piDir = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi");
@@ -75,28 +86,36 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			if (sub === "add") {
-				// /sources add mcp <name> <command> [args...]
+				// /sources add mcp <name> <command> [args...]   OR
+				// /sources add api <name> <spec-url-or-path> [--base-url URL] [--header NAME:VAL]
 				const kind = parts[1];
-				if (kind !== "mcp") {
-					await ctx.ui.notify("`/sources add` currently supports only `mcp` (Phase A). Usage: /sources add mcp <name> <command> [args...]", "warning");
+				if (kind !== "mcp" && kind !== "api") {
+					await ctx.ui.notify("`/sources add` supports `mcp` or `api` (OpenAPI). Usage: /sources add mcp <name> <command> [args...]  |  /sources add api <name> <spec> [--base-url URL] [--header NAME:VAL]", "warning");
 					return;
 				}
 				const name = parts[2];
-				const command = parts[3];
-				const cmdArgs = parts.slice(4);
-				if (!name || !command) {
-					await ctx.ui.notify("Usage: /sources add mcp <name> <command> [args...]", "warning");
-					return;
-				}
-				if (!/^[a-z0-9][a-z0-9-]{0,30}$/.test(name)) {
-					await ctx.ui.notify(`Invalid name "${name}" — need [a-z0-9-], start alphanumeric.`, "warning");
+				if (!name || !/^[a-z0-9][a-z0-9-]{0,30}$/.test(name)) {
+					await ctx.ui.notify(`Invalid name "${name || ""}" — need [a-z0-9-], start alphanumeric.`, "warning");
 					return;
 				}
 				if (mcp.servers.some((x: any) => x.name === name)) {
 					await ctx.ui.notify(`Server "${name}" already exists. /sources remove it first.`, "warning");
 					return;
 				}
-				mcp.servers.push({ name, command, args: cmdArgs.length ? cmdArgs : undefined, enabled: true });
+				if (kind === "mcp") {
+					const command = parts[3];
+					const cmdArgs = parts.slice(4);
+					if (!command) { await ctx.ui.notify("Usage: /sources add mcp <name> <command> [args...]", "warning"); return; }
+					mcp.servers.push({ name, command, args: cmdArgs.length ? cmdArgs : undefined, enabled: true });
+				} else {
+					// api: build a server entry that runs openapi-server.js against the spec
+					const specPath = parts[3];
+					if (!specPath) { await ctx.ui.notify("Usage: /sources add api <name> <spec-url-or-path> [--base-url URL] [--header NAME:VAL]", "warning"); return; }
+					const openapiServer = existsSync(OPENAPI_SERVER) ? OPENAPI_SERVER : join(homedir(), ".pi", "extensions", "mcp-bridge", "lib", "openapi-server.js");
+					const openapiArgs = [openapiServer, specPath];
+					for (let i = 4; i < parts.length; i++) openapiArgs.push(parts[i]); // pass --base-url/--header through
+					mcp.servers.push({ name, command: process.execPath, args: openapiArgs, enabled: true });
+				}
 				writeSettings(s);
 				await ctx.ui.notify(
 					`Added "${name}". NOT trusted yet — run \`/sources trust ${name}\`, then \`/reload\`.`,

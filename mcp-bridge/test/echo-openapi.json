@@ -1,0 +1,30 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "Echo Test API", "version": "1.0.0" },
+  "servers": [{ "url": "http://localhost:0" }],
+  "paths": {
+    "/echo/{msg}": {
+      "get": {
+        "operationId": "echo",
+        "summary": "Echo back the path param",
+        "parameters": [
+          { "name": "msg", "in": "path", "required": true, "schema": { "type": "string" }, "description": "message" }
+        ]
+      }
+    },
+    "/status": {
+      "get": {
+        "operationId": "getStatus",
+        "summary": "Return a fixed status object",
+        "parameters": []
+      }
+    },
+    "/submit": {
+      "post": {
+        "operationId": "submitThing",
+        "summary": "Submit a thing",
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"] } } } }
+      }
+    }
+  }
+}
