@@ -21,7 +21,7 @@ command -v pi >/dev/null 2>&1 || { fail "pi required"; exit 1; }
 SBX="$(mktemp -d /tmp/mcpe.XXXXXX)"
 trap 'rm -rf "$SBX"' EXIT
 mkdir -p "$SBX/extensions/mcp-bridge/lib" "$SBX/extensions/mcp-bridge/test" "$SBX/agent"
-cp mcp-bridge/index.ts "$SBX/extensions/mcp-bridge/"
+cp mcp-bridge/index.ts mcp-bridge/sources.ts "$SBX/extensions/mcp-bridge/"
 cp mcp-bridge/lib/*.js "$SBX/extensions/mcp-bridge/lib/"
 cp mcp-bridge/test/fake-server.js "$SBX/extensions/mcp-bridge/test/"
 FAKE="$SBX/extensions/mcp-bridge/test/fake-server.js"
@@ -63,5 +63,18 @@ REMAINING=$(pgrep -f fake-server.js | wc -l | tr -d ' ')
 [[ "$REMAINING" -eq 0 ]] \
 	|| { fail "A-3-3: ${REMAINING} orphan MCP server process(es) after session end"; exit 1; }
 ok "A-3-3: no orphan MCP server processes"
+
+header "A-3-4: /sources command co-registers (regression: e2404f3)"
+# The bridge's factory must co-register /sources (a missed-staging gap once
+# shipped it broken). Reset settings to a clean no-mcp state so a stale
+# server entry from the prior test can't interfere, then probe get_commands.
+echo '{"defaultModel":"gpt-test","extensions":[],"tools":{"allow":["read","bash"]}}' > "$SBX/agent/settings.json"
+# sanity: the bridge files must still be present (prior tests shouldn't delete them)
+[[ -f "$SBX/extensions/mcp-bridge/index.ts" ]] || { fail "A-3-4: bridge files vanished from sandbox"; exit 1; }
+[[ -f "$SBX/extensions/mcp-bridge/sources.ts" ]] || { fail "A-3-4: sources.ts vanished from sandbox"; exit 1; }
+OUT3=$(( echo '{"id":"c","type":"get_commands"}'; sleep 3 ) | pi --mode rpc --no-session 2>&1)
+echo "$OUT3" | grep -q '"name":"sources"' \
+	|| { fail "A-3-4: /sources command not registered (bridge co-regression)"; echo "$OUT3" | tail -3; exit 1; }
+ok "A-3-4: /sources command registered by the bridge"
 
 ok "mcp-bridge-ext"
