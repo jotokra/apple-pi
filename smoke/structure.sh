@@ -108,6 +108,22 @@ for j in lifecycle/collect-metrics.js lifecycle/aggregate-week.js lifecycle/appl
 done
 ok "lifecycle + CLI + vault node syntax clean"
 
+header "mcp-bridge schema + node syntax"
+for j in mcp-bridge/lib/mcp-client.js mcp-bridge/lib/schema.js mcp-bridge/test/fake-server.js; do
+	[[ -f "$j" ]] || { fail "missing $j"; exit 1; }
+	node --check "$j" || { fail "$j syntax"; exit 1; }
+done
+ok "mcp-bridge node syntax"
+# A-1-1: schema validator accepts a good entry, rejects bad ones (count-neutral)
+node -e "
+const {validateServers} = require('./mcp-bridge/lib/schema');
+const good = validateServers([{name:'github',command:'npx',args:['-y','x']}]);
+if (good.errors.length || good.servers.length!==1) { console.error('good entry rejected:',good.errors); process.exit(1); }
+const bad = validateServers([{name:'BAD NAME',command:''},{name:'ok',command:'npx',transport:'http'}]);
+if (bad.errors.length < 2) { console.error('bad entries not all caught:',bad.errors); process.exit(1); }
+" || { fail 'A-1-1: mcp schema validator misbehaves'; exit 1; }
+ok "A-1-1: mcp.servers schema validator (good accepted, bad rejected)"
+
 header "landing page + workflow present"
 [[ -f docs/index.html ]] || { fail "docs/index.html"; exit 1; }
 [[ -f .github/workflows/pages.yml ]] || { fail "pages workflow"; exit 1; }
