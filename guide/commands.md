@@ -19,7 +19,7 @@ has the exhaustive list; this is the part you'll actually type.
 | | |
 |---|---|
 | `Ctrl+P` | cycle / pick a model |
-| `Ctrl+V` or `/voice` | voice mode (type ⇄ talk) |
+| `Ctrl+Shift+V` or `/voice` | voice mode (type ⇄ talk) |
 | `/branch` | checkpoint the current plan as a new branch |
 | `/tree` | navigate the session tree |
 | `/vault …` | key management (below) |

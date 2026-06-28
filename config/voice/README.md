@@ -12,7 +12,7 @@ mic ─▶ ffmpeg ─▶ whisper.cpp (STT) ─▶ pi --mode rpc ─▶ text stre
 
 ### 1. Voice mode (from the pi TUI) — recommended
 
-Inside any `pi` session, type **`/voice`** (or press **Ctrl+V**). apple-pi
+Inside any `pi` session, type **`/voice`** (or press **Ctrl+Shift+V**). apple-pi
 launches pivoice on **the current session** — same conversation. Your voice
 turns append to the session JSONL. Press `q` to exit voice mode, then resume
 the TUI:

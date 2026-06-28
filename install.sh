@@ -318,7 +318,7 @@ _install_tree prompts
 _install_tree extensions
 
 # Voice bundle ships as a pi package (pivoice.py + bin + manifest). The bundle
-# is always copied (cheap; makes /voice + Ctrl+V exist). The heavy deps
+# is always copied (cheap; makes /voice + Ctrl+Shift+V exist). The heavy deps
 # (brew packages + ~465MB model) are OPT-IN: one yorn prompt calls the
 # reusable lifecycle/voice-enable.sh. Decline -> /voice still exists and
 # prints the enable command when the user tries it.

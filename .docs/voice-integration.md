@@ -61,7 +61,7 @@ This is honest about the constraint and fully delivers the intent.
   installer offers `brew install` for them (best-effort, never fail).
 
 `config/extensions/voice.ts` — the bridge extension:
-- Registers `/voice` command + `Ctrl+V` shortcut (TUI only, `ctx.mode==="tui"`).
+- Registers `/voice` command + `Ctrl+Shift+V` shortcut (TUI only, `ctx.mode==="tui"`).
 - Handler: resolve session file → if none, continue-recent → print the launch
   line + `ctx.ui.confirm` to exec now; on confirm, `child_process.spawn` pivoice
   with `stdio: "inherit"` against the session, await it; on return, notify +

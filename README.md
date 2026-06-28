@@ -127,7 +127,7 @@ plan, navigate back.
 |---|---|
 | `/vault add` · `list` · `get` · `remove` · `rotate` · `lock` | encrypted, trace-free credential store (see [Credential Vault](#credential-vault)) |
 | `/vault export <id>` · `export-to <id>` | bridge a key into `auth.json` or your own `vault.exportCmd` |
-| `/voice` (or **Ctrl+V**) | type ⇄ talk, on-device (see [Voice mode](#voice-mode-type--talk)) |
+| `/voice` (or **Ctrl+Shift+V**) | type ⇄ talk, on-device (see [Voice mode](#voice-mode-type--talk)) |
 | `/decompose` · `/spec` · `/redteam` · `/design` | the four methodology prompts |
 | `/skill:self-assess` | re-tune the config to your current model |
 
@@ -278,7 +278,7 @@ apple-pi bundles **pivoice** — speak a prompt, hear the reply, fully
 on-device (whisper.cpp + `say`). Type in the pi TUI, flip to voice, flip
 back — **same conversation**:
 
-- In any `pi` session, type **`/voice`** (or press **Ctrl+V**). apple-pi
+- In any `pi` session, type **`/voice`** (or press **Ctrl+Shift+V**). apple-pi
   launches pivoice on the current session; voice turns append to the same
   JSONL.
 - Talk. Press `q` to exit voice mode.
