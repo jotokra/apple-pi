@@ -30,10 +30,10 @@ count=$(find config/prompts -type f -name '*.md' | wc -l | tr -d ' ')
 [[ "$count" -eq 4 ]] || { fail "expected 4 prompts, got $count"; exit 1; }
 ok "4 prompts"
 
-header "extensions (9 single-file .ts)"
+header "extensions (10 single-file .ts)"
 count=$(find config/extensions -maxdepth 1 -type f -name '*.ts' | wc -l | tr -d ' ')
-[[ "$count" -eq 9 ]] || { fail "expected 9 single-file extensions, got $count"; exit 1; }
-ok "9 single-file extensions"
+[[ "$count" -eq 10 ]] || { fail "expected 10 single-file extensions (added sync.ts in S-8), got $count"; exit 1; }
+ok "10 single-file extensions"
 
 header "web bundle present"
 [[ -f config/extensions/web/index.ts ]] || { fail "missing config/extensions/web/index.ts"; exit 1; }
