@@ -97,5 +97,37 @@ The classification engine (`paths.js`) is pure, side-effect-free, and the only p
 4. `smoke/structure.sh` — the tripwire counts (S-8 bumps 9→10 extensions, S-9 bumps 8→9 skills).
 5. The card being executed (its REQ-N-M list is the contract).
 
+## Progress (build log)
+
+| Card | Status | Commit | Notes |
+|------|--------|--------|-------|
+| S-0  | ✅ done | `1d6fea7` | this spec (cherry-picked at resume; original `e3a078d` on the abandoned `feat/config-sync`) |
+| S-1  | ✅ done | `c79433f` | `sync/lib/paths.js` classification engine; smoke green (S-1.1..1.6) |
+| S-2  | ✅ done | `514127b` | gitignore generator + Node secret hook; smoke green (S-2.1..2.5) |
+| S-3  | ✅ done | `b1ab96c` | `init` + repo wiring + bin dispatch; smoke green (S-3.1..3.5 incl. end-to-end commit-block). Two real bugs found+fixed by the smoke (hook shim PATH resolution; `hook-run` CWD via `git rev-parse --show-toplevel`). |
+| S-4  | ✅ done | `5f86cbe` | `push`/`pull`/`status`; smoke green (S-4.1..4.6). One real bug found+fixed (hookrun `git()` ignored the `dir` arg — push pre-flight scanned the wrong repo). |
+| S-5  | ⏳ next | — | `doctor` (health + full-history secret-scan). Pure functionality; ~1 commit. |
+| S-6  | ⏳ todo | — | `sync/lib/profile.js` settings.json portable/device split; unblocks clean consolidation. |
+| S-7  | ⏳ todo | — | `consolidate <branch>` cherry-pick picker. **OQ1 open:** auto-PR vs stage+print (spec defers; recommend stage+print for v1). |
+| S-8  | ⏳ todo | — | `config/extensions/sync.ts` `/sync` TUI; **bumps structure.sh extension count 9→10**. |
+| S-9  | ⏳ todo | — | user-facing docs (guide/*, HOWTO) + onboarding offer + `gh-config-sync` skill; **bumps skill count 8→9**. |
+
+**Branch:** `feat/config-sync-v2` (off current `main` `3eedff7`). All 4 sync smokes + structure.sh green, count-neutral. Push to `origin/feat/config-sync-v2` backs it up.
+
+## Resume procedure (next session)
+
+```bash
+cd ~/.apple-pi
+git fetch --all
+git checkout feat/config-sync-v2
+git log --oneline main..HEAD            # confirm S-0..S-4 present
+bash smoke/run.sh                       # or: for s in sync-paths sync-gitignore sync-init sync-pushpull structure; do bash smoke/$s.sh; done
+# All green → pick up at S-5 (doctor). Read the S-5 row above + this spec's
+# Phased plan for the REQ hooks.
+```
+
+If `main` has advanced, `git rebase main` — the sync files are additive (new `sync/` dir, new smokes) so conflicts should only be in `smoke/run.sh` (shared registration loop); resolve by keeping the union of registrations.
+
 ## Version history
 - v0.1.0 (2026-06-28) — initial spec. Cards S-1..S-9 defined; executing in dependency order.
+- v0.2.0 (2026-06-29) — S-0..S-4 shipped + verified on `feat/config-sync-v2`. Added Progress + Resume sections. Next: S-5.
