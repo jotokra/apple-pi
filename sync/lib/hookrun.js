@@ -27,25 +27,23 @@ const KEY_SHAPES =
 	"xai-[A-Za-z0-9]{40,}|" +
 	"AIza[0-9A-Za-z_-]{35}";
 
-/** Run git in the repo; return trimmed stdout. */
-function git(args, opts = {}) {
-	const r = spawnSync("git", args, { encoding: "utf8", ...opts });
+/** Run git in `dir` (defaults to CWD); return trimmed stdout. */
+function git(args, dir, opts = {}) {
+	const r = spawnSync("git", dir ? ["-C", dir, ...args] : args, { encoding: "utf8", ...opts });
 	return { status: r.status ?? 0, stdout: (r.stdout || "").trim() };
 }
 
 /** Staged files (added/copied/modified — not deleted), relative paths. */
-function stagedFiles() {
-	const out = git(["diff", "--cached", "--name-only", "--diff-filter=ACMR"]);
+function stagedFiles(dir) {
+	const out = git(["diff", "--cached", "--name-only", "--diff-filter=ACMR"], dir);
 	if (out.status !== 0) return [];
 	return out.stdout ? out.stdout.split("\n") : [];
 }
 
-/** Fetch a staged blob's content from the index (null if binary/missing). */
-function stagedContent(file) {
-	// `git grep --cached` is the clean way to scan the staged tree.
-	const r = spawnSync("git", ["grep", "--cached", "-I", "--line-number", "-E", "-e", KEY_SHAPES, "--", file], {
-		encoding: "utf8",
-	});
+/** Fetch a staged blob's content from the index ([] if binary/missing). */
+function stagedContent(dir, file) {
+	const args = ["grep", "--cached", "-I", "--line-number", "-E", "-e", KEY_SHAPES, "--", file];
+	const r = spawnSync("git", dir ? ["-C", dir, ...args] : args, { encoding: "utf8" });
 	if (r.status === 0 && r.stdout) {
 		// filter out comment/doc lines (false-positive hygiene)
 		return r.stdout
@@ -66,7 +64,7 @@ function runHook(opts = {}) {
 	const c = classify(dir);
 	const reasons = [];
 
-	for (const file of stagedFiles()) {
+	for (const file of stagedFiles(dir)) {
 		const rel = file.split(path.sep).join("/");
 
 		// (a) secret-by-path.
@@ -76,7 +74,7 @@ function runHook(opts = {}) {
 		}
 
 		// (b) secret-by-content (real key shape, not comments).
-		const hits = stagedContent(file);
+		const hits = stagedContent(dir, file);
 		if (hits.length) {
 			reasons.push(`provider key shape in staged content: ${rel} (${hits.length} hit${hits.length === 1 ? "" : "s"})`);
 		}

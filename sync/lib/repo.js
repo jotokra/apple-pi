@@ -119,9 +119,44 @@ function push(dir, branch) {
 	return { status: r.status, stderr: r.stderr, stdout: r.stdout };
 }
 
+/** `git fetch origin` (quiet). Returns status. */
+function fetch(dir) {
+	return git(dir, ["fetch", "--quiet", "origin"]).status === 0;
+}
+
+/** `git pull --ff-only origin <branch>`. Returns {status, stdout, stderr}. */
+function pull(dir, branch) {
+	const r = git(dir, ["pull", "--ff-only", "--quiet", "origin", branch]);
+	return { status: r.status, stdout: r.stdout, stderr: r.stderr };
+}
+
+/** Count commits on <branch> not on origin/<branch>. 0 if up-to-date / no upstream. */
+function unpushedCount(dir, branch) {
+	const r = git(dir, ["rev-list", "--count", `origin/${branch}..${branch}`]);
+	const n = parseInt(r.stdout, 10);
+	return isNaN(n) ? 0 : n;
+}
+
+/** Portable paths that are modified in the working tree (unstaged or staged),
+ *  relative. Uses the classification to filter. */
+function dirtyPortable(dir) {
+	const { classify } = require("./paths");
+	const c = classify(dir);
+	const out = git(dir, ["status", "--porcelain"]);
+	if (out.status !== 0) return [];
+	const dirty = [];
+	for (const line of out.stdout.split("\n").filter(Boolean)) {
+		// porcelain: XY <path>; path may be quoted. Drop the 2-char status.
+		const rel = line.slice(3).replace(/^"|"$/g, "").split(path.sep).join("/");
+		if (rel && require("./paths").matchesAny(rel, c.portable)) dirty.push(rel);
+	}
+	return dirty;
+}
+
 module.exports = {
 	git, hasGh, isRepo, gitInit, deviceBranch,
 	ensureHook, hookHealthy, writeGitignore, commitAll,
 	remoteUrl, setRemote, createGhRepo, push,
+	fetch, pull, unpushedCount, dirtyPortable,
 	HOOK_DIR,
 };
