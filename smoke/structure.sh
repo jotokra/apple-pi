@@ -108,6 +108,13 @@ for j in lifecycle/collect-metrics.js lifecycle/aggregate-week.js lifecycle/appl
 done
 ok "lifecycle + CLI + vault node syntax clean"
 
+header "sync node syntax"
+for j in sync/cli.js sync/lib/paths.js sync/lib/gitignore.js sync/lib/hookrun.js sync/lib/repo.js; do
+	[[ -f "$j" ]] || { fail "missing $j"; exit 1; }
+	node --check "$j" || { fail "$j syntax"; exit 1; }
+done
+ok "sync node syntax"
+
 header "ingress node + shell syntax"
 bash -n ingress/schedule.sh || { fail "ingress/schedule.sh syntax"; exit 1; }
 for j in ingress/lib/poller.js ingress/lib/state.js ingress/lib/inject.js; do
