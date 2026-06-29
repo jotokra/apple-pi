@@ -6,7 +6,8 @@
  *   forgejo_get_repo    → GET /api/v1/repos/{owner}/{name}
  *   forgejo_create_pr   → POST /api/v1/repos/{owner}/{name}/pulls
  *
- * Configuration (env vars — NO defaults baked in):
+ * Configuration (env vars — NO defaults baked in; or device-local
+ *   agent/env.local KEY=VALUE, see _lib/envlocal.ts):
  *   FORGEJO_BASE_URL  — e.g. https://git.example.com
  *   FORGEJO_TOKEN     — an access token with repo + PR scopes
  *
@@ -14,6 +15,7 @@
  * GitLab, add a separate extension or use the `gh`/`glab` CLI via bash.
  */
 
+import "./_lib/envlocal"; // device-local env overrides (agent/env.local)
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
