@@ -82,7 +82,7 @@ The classification engine (`paths.js`) is pure, side-effect-free, and the only p
 - **R2 (settings.json split correctness):** the portable/device field partition must be exactly right or `pull` corrupts a device's config. **Mitigation:** explicit allowlist of device-specific fields (`sessionDir`, `shellPath`, `defaultModel`, `defaultProvider`, `_models`); everything else portable; merge preserves device fields byte-for-byte; smoke round-trips a synthetic settings.json.
 - **R3 (`gh` not present / not authed):** `init` must degrade to "paste a remote URL" for Forgejo/self-hosted, and never paste a token. **Mitigation:** detect `gh`, else prompt for remote URL; never write tokens to git config.
 - **R4 (history secret scan false positives):** shape-regex over all history may flag example keys in docs. **Mitigation:** skip comment/doc lines; report as WARNING not BLOCKER for historical finds; link to `/vault rotate`.
-- **OQ1:** should `consolidate` auto-open a PR (via the `gh-fix-pr` flow) or just stage + print the command? — **Deferred:** ship the stage+picker first; PR-opening is a thin follow-up.
+- **OQ1:** should `consolidate` auto-open a PR (via the `gh-fix-pr` flow) or just stage + print the command? — **DECIDED (user, 2026-06-29): stage + print.** No auto-PR. The consolidator stages the cherry-picked portable changes and prints the suggested `git commit` + `git push` commands for the user to review/run. (Frozen decision — do not re-litigate.)
 
 ## Conventions
 - Commit messages: `feat(sync):` / `fix(sync):` / `test(sync):` / `docs(sync):` / `chore(sync):`.
