@@ -37,8 +37,14 @@ apple-pi is the bet that there's a better middle:
   any model; the harness adapts.
 - **Methodology arrives as skills, not opinions baked into the binary.**
   Spec-first planning, verify-your-own-work, red/blue review, decomposition —
-  eight reusable skills you can read, run, edit, or remove. The agent is
+  ten reusable skills you can read, run, edit, or remove. The agent is
   opinionated about *how* to work; you keep the right to disagree.
+- **It follows you across machines.** `apple-pi sync` keeps the portable part
+  of your config (skills, extensions, prompts, the agent contract) in a
+  private repo so it moves between devices. **Secrets never leave the device**
+  — a computed classification, a default-deny gitignore, and a
+  secret-blocking pre-commit hook make it safe by construction, not by
+  discipline (see [Config sync](#config-sync-multi-device)).
 - **You own it.** Zero telemetry, zero vendor lock-in, MIT. Nothing phones
   home — `smoke/sanitize.sh` enforces that no personal data ships, on every
   change. It's a pi config plus a persona, not a service.

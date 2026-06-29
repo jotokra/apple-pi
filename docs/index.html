@@ -131,13 +131,14 @@
 		grid-template-columns: repeat(3, 1fr);
 		grid-template-areas:
 			"big big big"
-			"voice voice integ";
+			"voice voice integ"
+			"sync sync reach";
 	}
 	@media (max-width: 860px) {
-		.bento { grid-template-columns: 1fr 1fr; grid-template-areas: "big big" "voice integ"; }
+		.bento { grid-template-columns: 1fr 1fr; grid-template-areas: "big big" "voice integ" "sync reach"; }
 	}
 	@media (max-width: 600px) {
-		.bento { grid-template-columns: 1fr; grid-template-areas: "big" "voice" "integ"; }
+		.bento { grid-template-columns: 1fr; grid-template-areas: "big" "voice" "integ" "sync" "reach"; }
 	}
 	.tile {
 		background: linear-gradient(160deg, rgba(255,246,235,0.055), rgba(255,246,235,0.018));
@@ -159,6 +160,8 @@
 	.tile.big h3 { font-size: clamp(1.5rem, 3vw, 1.9rem); }
 	.tile.voice { grid-area: voice; }
 	.tile.integ { grid-area: integ; }
+	.tile.sync { grid-area: sync; }
+	.tile.reach { grid-area: reach; }
 
 	/* ── research loop (signature visual, inside the big tile) ──────── */
 	.loop {
@@ -294,7 +297,7 @@
 <section id="features" style="padding-top:1.5rem;">
 	<div class="wrap">
 		<p class="eyebrow">What makes it different</p>
-		<h2>Three things you don't usually get <span class="accent">in one agent.</span></h2>
+		<h2>Five things you don't usually get <span class="accent">in one agent.</span></h2>
 
 		<div class="bento">
 
@@ -354,6 +357,35 @@
 					<span class="chip">kanban</span>
 					<span class="chip">netbird</span>
 					<span class="chip"><code>+ your own</code></span>
+				</div>
+			</div>
+
+			<!-- CONFIG SYNC (multi-device) -->
+			<div class="tile sync">
+				<span class="label"><span class="dot"></span> Multi-device · config sync</span>
+				<h3>Your setup, on every machine.</h3>
+				<p>Sync the portable part of your config — skills, extensions, prompts, the agent contract — to a private repo.
+					<strong>Secrets never leave the device</strong>: a computed classification, a default-deny gitignore, and a
+					secret-blocking pre-commit hook make it safe by construction.</p>
+				<div class="term">
+					<div><span class="p">&gt;</span> <span class="y">apple-pi sync init</span> <span class="mu"># origin → main</span></div>
+					<div><span class="p">&gt;</span> <span class="y">apple-pi sync consolidate device/phone</span></div>
+					<div class="mu">… folds another device's portable changes in. Secrets refused, device-local preserved.</div>
+				</div>
+			</div>
+
+			<!-- REACH (MCP + ingress: the agent pulls the world in) -->
+			<div class="tile reach">
+				<span class="label"><span class="dot"></span> Reaches out · MCP + ingress</span>
+				<h3>The world feeds in, on your terms.</h3>
+				<p>Bring any MCP server as tools (<code>/sources add</code>, incl. an OpenAPI loader), and poll RSS / APIs / pages via
+					the ingress bus. Ingress content ships wrapped <strong>UNTRUSTED — data, never instructions</strong>, the defense
+					against indirect prompt injection.</p>
+				<div class="bridges">
+					<span class="chip">🔌 <b>MCP</b></span>
+					<span class="chip">📡 <b>ingress</b></span>
+					<span class="chip"><code>/sources</code></span>
+					<span class="chip">OpenAPI</span>
 				</div>
 			</div>
 
