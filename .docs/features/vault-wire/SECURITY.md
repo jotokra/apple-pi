@@ -13,7 +13,7 @@
 | A8 | **Same-user process reads a projected secret** — a malicious/curious tool or child process enumerates `process.env` to hoover keys. | ✅ **primary** | C-1 / B-VW-1: secrets go to an in-memory registry + `secret(id)`, **never** `process.env`. The whole point of not injecting env. |
 | A9 | **`auth.json` / `agent-secrets` plaintext read by a disk thief** (the surfaces FileVault-off leaves exposed). | ⚠️ → ✅ (P3) | these become *regenerable projections* of the vault. P1 still writes plaintext (backward-compat baseline); P3 rewrites `auth.json` to `!command` pointers so no plaintext provider key sits there. agent-secrets stays plaintext but is now a fan-out, not an independent store. |
 | A10 | **Cloud eavesdropper / iCloud account compromise** reads the synced vault. | ✅ | the synced file is ciphertext (aes-256-cbc · pbkdf2 · 600k); the passphrase is NOT in the cloud (it's per-device keychain). Compromise of iCloud yields an encrypted blob, not keys. |
-| A11 | **Lost device** — a finder boots the mini; the keychain auto-unlocks (auto-login). | ⚠️ partial | the master passphrase is in the keychain, which unlocks at GUI login. Physical protection is the user's stated boundary (home server). `/vault lock --keychain` removes the passphrase entry for travel/loan. Same residual as A4 — the vault is defense-in-depth, not the outer wall. |
+| A11 | **Lost device** — a finder boots the device; the keychain auto-unlocks (auto-login). | ⚠️ partial | the master passphrase is in the keychain, which unlocks at GUI login. Physical protection is the user's stated boundary (home server). `/vault lock --keychain` removes the passphrase entry for travel/loan. Same residual as A4 — the vault is defense-in-depth, not the outer wall. |
 | A12 | **iCloud conflict copy merges a stale/revoked secret back in.** | ✅ | `/vault reconcile` **never silently overwrites a divergent secret** — it lists divergent ids for manual resolution (REQ-VW-10). A revoked key that lingers in a conflict copy is surfaced, not auto-merged. |
 | A13 | **`!command` reader leaks the secret via its own env/argv** (P3). | ✅ | `bin/apple-pi vault-key <id>` takes the id as argv (non-secret), reads the passphrase via the keychain chain, prints the secret to **stdout only**. It is the *only* `!command` target we ship; users adding their own command target own that surface. |
 
@@ -61,7 +61,7 @@ which is disqualifying:
   `.zshrc` problem the `agent-secrets` store was built to fix (that was
   shell-scoped; this is agent-process-scoped, and pi spawns shells constantly).
 - **R-VW-b (`ps e` exposure).** Any same-user process can read pi's environment
-  via `ps eww <pid>`. The mini is single-user, so the threat is "another
+  via `ps eww <pid>`. The host is single-user, so the threat is "another
   process running as jay" — exactly the boundary `agent-secrets` defends in
   depth against. Injecting env re-opens the hole the vault exists to close.
 - **R-VW-c (crash dumps / core files).** A pi crash captures `environ` into a
@@ -87,8 +87,8 @@ status quo (where the same secret is ALSO in `auth.json` plaintext AND
 
 - **R-VW-1: "What if the keychain is locked on a headless SSH session?"**
   → DEFEND: `resolvePassphrase()` tier 2 is best-effort; a locked keychain
-  falls through to tier 1 (`CREDENTIALS_VAULT_PASS`) or tier 3 (tty). On the
-  mini specifically, auto-login + GUI session means the keychain is unlocked
+  falls through to tier 1 (`CREDENTIALS_VAULT_PASS`) or tier 3 (tty). On a macOS
+  host with auto-login specifically, the GUI session means the keychain is unlocked
   even for SSH-spawned pi (verified 2026-06-29). A pure server (no GUI) must
   set `CREDENTIALS_VAULT_PASS` via a wrapper. ACCEPTED per-platform residual.
 - **R-VW-2: "What if the synced vault is mid-sync (half-written) when a device
@@ -119,6 +119,21 @@ status quo (where the same secret is ALSO in `auth.json` plaintext AND
   per request. `vault-key` is a fast local decrypt (<50ms). A documented
   timeout in pi's command resolver is the backstop. P3 is optional; P1's
   plaintext baseline has no subprocess. ACCEPTED.
+- **R-VW-7: "`/vault unlock` puts the master passphrase in argv (the
+  `security add-generic-password -w <pass>` call)."** → MITIGATE + ACCEPTED:
+  macOS `security` offers NO stdin/tty-free way to set a generic-password
+  without a native pty dep (which would violate the zero-dep stance the vault
+  core is built on). The passphrase is therefore in the `security` process's
+  argv for the ~100ms it runs — visible to same-user `ps`. The READ path leaks
+  nothing (`find-generic-password -w` prints to our captured stdout, never
+  argv). Mitigations: (a) the write is a one-time-per-device operation
+  (`/vault unlock`), not per-session; (b) `spawnSync`/`execFileSync` minimizes
+  the window; (c) the exposed value is bounded to the same-user trust boundary
+  (A3) the vault already accepts. Net: this is a narrower exposure than the
+  plaintext-at-rest surfaces (auth.json, agent-secrets) that vault-wire
+  *removes*, so the feature is still a net win. ACCEPTED residual — the
+  alternative (native pty / keytar) trades this narrow window for a native-dep
+  supply-chain surface, which is the worse deal.
 
 ## Multi-device sync — the honest threat picture
 

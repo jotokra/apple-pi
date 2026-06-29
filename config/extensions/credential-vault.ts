@@ -84,12 +84,23 @@ function noCoreError(ctx: ExtensionCommandContext): void {
 
 // ── passphrase cache (per-process; `/vault lock` flushes) ─────────────
 let cachedPass: string | null = null;
-async function getPassphrase(ctx: ExtensionCommandContext): Promise<string | null> {
+// REQ-VW-1: three-tier passphrase resolution. First non-empty wins:
+//   tier 1 — CREDENTIALS_VAULT_PASS env (headless / wrapper-set; explicit operator intent)
+//   tier 2 — macOS keychain service "apple-pi-vault" (P3 unlock; best-effort,
+//            locked/missing/non-macOS falls through — never throws)
+//   tier 3 — tty prompt (interactive pi only)
+// `core` is the vault core (provides keychainRead); it is already loaded by
+// the handler before this is called. Cached on first success for the process.
+async function getPassphrase(ctx: ExtensionCommandContext, core: any): Promise<string | null> {
 	if (cachedPass) return cachedPass;
-	// Preferred: env var (headless / set by a wrapper). Then tty-style prompt.
+	// tier 1: env (highest priority — explicit operator intent).
 	const env = process.env.CREDENTIALS_VAULT_PASS;
 	if (env) { cachedPass = env; return env; }
-	if (!ctx.hasUI) { ctx.ui.notify("vault: passphrase required (set CREDENTIALS_VAULT_PASS or run in the TUI)", "error"); return null; }
+	// tier 2: keychain (P3). Best-effort: locked/missing/non-macOS → null → fall through.
+	const kc = core.keychainRead();
+	if (kc) { cachedPass = kc; return kc; }
+	// tier 3: tty prompt (interactive pi only).
+	if (!ctx.hasUI) { ctx.ui.notify("vault: passphrase required (set CREDENTIALS_VAULT_PASS, run /vault unlock, or run in the TUI)", "error"); return null; }
 	const pass = await ctx.ui.input("Vault passphrase");
 	if (!pass) { ctx.ui.notify("vault: no passphrase entered", "warning"); return null; }
 	cachedPass = pass;
@@ -413,16 +424,52 @@ async function cmdExportTo(ctx: ExtensionCommandContext, core: any, args: string
 	}
 }
 
-function cmdLock(ctx: ExtensionCommandContext): void {
+// REQ-VW-2: `/vault unlock` — capture the master passphrase (masked) and store
+// it in the keychain so every future /vault use (and the auto-wire, P1) resolves
+// headlessly without re-typing. Verifies the passphrase actually opens the vault
+// (readVault throws on a wrong one) before storing; bootstraps an empty vault if
+// none exists yet. Re-running replaces the stored entry (keychainWrite is idempotent).
+async function cmdUnlock(ctx: ExtensionCommandContext, core: any): Promise<void> {
+	const existing = core.keychainRead();
+	const prompt = existing
+		? "Re-enter the vault passphrase (replaces the stored keychain entry; masked)"
+		: "Enter the vault passphrase to store in the keychain (masked; dots only)";
+	const pass = await captureSecret(ctx, core, prompt);
+	if (!pass) { ctx.ui.notify("vault unlock: no passphrase entered — nothing stored", "warning"); return; }
+	// verify: readVault throws on a WRONG passphrase; returns null only if no vault
+	// file exists (then bootstrap an empty one with this passphrase).
+	try {
+		const env = core.readVault(pass);
+		if (env === null) core.ensureVault(pass);
+	} catch (e: any) {
+		ctx.ui.notify(`vault unlock: incorrect passphrase — not stored`, "error");
+		return;
+	}
+	const ok = core.keychainWrite(pass);
+	if (!ok) { ctx.ui.notify("vault unlock: could not write to the keychain (macOS only, or keychain locked)", "error"); return; }
+	cachedPass = pass; // cache for this session too, so the very next /vault call is instant
+	ctx.ui.notify(`vault: passphrase stored in the keychain${existing ? " (replaced)" : ""} — /vault now resolves headlessly`, "info");
+}
+
+function cmdLock(ctx: ExtensionCommandContext, core: any, args: string): void {
+	const { flags } = parseArgs(args);
 	cachedPass = null;
-	ctx.ui.notify("vault: passphrase forgotten — re-prompt next /vault use", "info");
+	if (flags["keychain"] !== undefined) {
+		const ok = core.keychainDelete();
+		ctx.ui.notify(
+			ok ? "vault: passphrase forgotten + keychain entry removed (next /vault re-prompts)" : "vault: passphrase forgotten, but no keychain entry was present to remove",
+			ok ? "info" : "warning",
+		);
+		return;
+	}
+	ctx.ui.notify("vault: passphrase forgotten for this session — re-prompt next /vault use (add --keychain to also remove the stored keychain entry)", "info");
 }
 
 // ── registration ──────────────────────────────────────────────────────
 export default function credentialVaultExtension(pi: ExtensionAPI): void {
-	const SUBS = ["add", "list", "get", "remove", "rotate", "import", "export", "export-to", "lock", "prune-transient"];
+	const SUBS = ["add", "list", "get", "remove", "rotate", "import", "export", "export-to", "lock", "unlock", "prune-transient"];
 	pi.registerCommand("vault", {
-		description: "Encrypted credential vault (add/list/get/remove/rotate/import/export/lock)",
+		description: "Encrypted credential vault (add/list/get/remove/rotate/import/export/lock/unlock)",
 		getArgumentCompletions: (prefix) => {
 			const hits = SUBS.filter((s) => s.startsWith(prefix));
 			return hits.length ? hits.map((s) => ({ value: s, label: s })) : null;
@@ -437,9 +484,10 @@ export default function credentialVaultExtension(pi: ExtensionAPI): void {
 			const sub = (sp >= 0 ? trimmed.slice(0, sp) : trimmed) || "list";
 			const rest = sp >= 0 ? trimmed.slice(sp + 1) : "";
 
-			// lock + list need no passphrase upfront (lock clears it; list will prompt)
-			if (sub !== "lock") {
-				const pass = await getPassphrase(ctx);
+			// lock + unlock manage the passphrase themselves and skip the upfront gate;
+			// list will prompt via getPassphrase below.
+			if (sub !== "lock" && sub !== "unlock") {
+				const pass = await getPassphrase(ctx, core);
 				if (!pass) return;
 				try { core.ensureVault(pass); }
 				catch (e: any) { ctx.ui.notify(`vault: could not open vault: ${e?.message || String(e)}`, "error"); return; }
@@ -455,9 +503,10 @@ export default function credentialVaultExtension(pi: ExtensionAPI): void {
 				case "export":           return cmdExport(ctx, core, rest);
 				case "export-to":        return cmdExportTo(ctx, core, rest);
 				case "prune-transient":  return cmdPruneTransient(ctx, core);
-				case "lock":             return cmdLock(ctx); return;
+				case "lock":             return cmdLock(ctx, core, rest);
+				case "unlock":           return cmdUnlock(ctx, core);
 				default:
-					ctx.ui.notify(`vault: unknown subcommand "${sub}" — try add/list/get/remove/rotate/import/export/lock`, "warning");
+					ctx.ui.notify(`vault: unknown subcommand "${sub}" — try add/list/get/remove/rotate/import/export/lock/unlock`, "warning");
 			}
 		},
 	});

@@ -12,7 +12,7 @@
 
 Today, adding a secret touches up to **four** surfaces by hand: the encrypted
 vault (`/vault add`), `auth.json` (pi provider keys, plaintext), the
-`agent-secrets` store (the-agent/Claude, plaintext), and per-bridge `process.env`
+`agent-secrets` store (other agents, plaintext), and per-bridge `process.env`
 via `env.local` (non-secret by convention, but keys leak in there in practice).
 Each device re-does this; there's no sync; the plaintext copies proliferate.
 
@@ -112,7 +112,7 @@ for a known id).
 1. **`CREDENTIALS_VAULT_PASS` env** (headless/CI/wrapper-set; unchanged from
    credential-vault). Highest priority — explicit operator intent.
 2. **`security find-generic-password -s apple-pi-vault -w`** (keychain, P3).
-   Headless-safe on the mini because it auto-logs-in at boot → keychain unlocks
+   Headless-safe on a host that auto-logs-in at boot → the keychain unlocks
    with the GUI session. **Verified** (2026-06-29): a probe item round-tripped
    read/write/delete in this exact process context.
 3. **tty prompt** (interactive `pi` only; the v1 credential-vault path).
@@ -132,8 +132,8 @@ lazy registry) reads this map and fans out:
 "vault": {
   "passphraseSource": "keychain:apple-pi-vault",   // resolves via tier 2 above
   "wire": {
-    "<provider>":      { "to": "auth" },                                   // → auth.json (provider key, plaintext in P1; !command in P3)
-    "minimax":  { "to": "auth" },
+    "openai":   { "to": "auth" },                                   // → auth.json (provider key, plaintext in P1; !command in P3)
+    "anthropic": { "to": "auth" },
     "forgejo":  { "to": "bridge", "secret": "forgejo" },            // → registry; bridge calls secret("forgejo")
     "netbird":  { "to": "bridge", "secret": "netbird" },
     "github":   { "to": "command", "cmd": "agent-secret set $VAULT_ID" },  // → agent-secrets store (exportToCommand)
@@ -176,7 +176,7 @@ from the registry and falls back — graceful, no breakage.
 The vault is ciphertext, so it is safe over untrusted cloud. Sync needs no new
 crypto, no new store — just a path:
 
-1. **Enable iCloud Drive** on the mini (signed into iCloud today; Drive is the
+1. **Enable iCloud Drive** on the host (signed into iCloud; Drive is the
    one toggle off — a System Settings step the user drives). AGENTS.md already
    permits Apple ID/iCloud.
 2. **Point the vault at iCloud**: `CREDENTIALS_VAULT="$HOME/Library/Mobile
@@ -204,7 +204,7 @@ subprocess and is cached for process lifetime — so it CAN serve the current
 session live:
 
 ```jsonc
-"<provider>": { "type": "api_key", "key": "!<vault-reader> <provider>" }
+"openai": { "type": "api_key", "key": "!<vault-reader> openai" }
 ```
 
 where `<vault-reader>` is a tiny helper (`bin/apple-pi vault-key <id>`) that
@@ -228,7 +228,7 @@ of touch" and aligns with the at-rest-shrinking goal.
   service `apple-pi-vault` (account = the user); `/vault lock --keychain`
   deletes it. Both are confirm-gated and never echo the passphrase.
 - **REQ-VW-3** A smoke verifies the keychain tier resolves headlessly on the
-  mini (probe item round-trip), proving P3 viability per device.
+  resolves headlessly on the host (probe item round-trip), proving P3 viability per device.
 
 **Phase 1 — the wire (core)**
 
@@ -310,7 +310,7 @@ Suggested merge order: 1 → 2 → 3 ‖ 4 → (5 ‖ 6) → PR to `main`.
   tier 2 is absent → falls through to env (tier 1) or tty (tier 3). Document
   that the cloud-synced vault is cross-platform, but keychain unlock is mac-
   specific; Linux devices use `CREDENTIALS_VAULT_PASS` from a wrapper.
-- **iCloud Drive not yet enabled on the mini.** Drive is off today (signed into
+- **iCloud Drive may not be enabled.** Drive can be off (signed into
   iCloud). Enabling is a user GUI step; the vault works locally until then.
 - **1Password as a future backend.** iCloud is the zero-code choice; if iCloud
   conflict-copy churn ever bites, a 1Password backend (vault becomes a cache,
