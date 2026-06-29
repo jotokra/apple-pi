@@ -20,20 +20,20 @@ for f in install.sh README.md LICENSE .gitignore .docs/PLAN.md \
 done
 ok "required files"
 
-header "skills (9 SKILL.md)"
+header "skills (10 SKILL.md)"
 count=$(find config/skills -type f -name SKILL.md | wc -l | tr -d ' ')
-[[ "$count" -eq 9 ]] || { fail "expected 9 skills, got $count"; exit 1; }
-ok "9 skills"
+[[ "$count" -eq 10 ]] || { fail "expected 10 skills (8 base + autonomous-execution + config-sync), got $count"; exit 1; }
+ok "10 skills"
 
 header "prompts (4)"
 count=$(find config/prompts -type f -name '*.md' | wc -l | tr -d ' ')
 [[ "$count" -eq 4 ]] || { fail "expected 4 prompts, got $count"; exit 1; }
 ok "4 prompts"
 
-header "extensions (9 single-file .ts)"
+header "extensions (10 single-file .ts)"
 count=$(find config/extensions -maxdepth 1 -type f -name '*.ts' | wc -l | tr -d ' ')
-[[ "$count" -eq 9 ]] || { fail "expected 9 single-file extensions, got $count"; exit 1; }
-ok "9 single-file extensions"
+[[ "$count" -eq 10 ]] || { fail "expected 10 single-file extensions (added sync.ts in S-8), got $count"; exit 1; }
+ok "10 single-file extensions"
 
 header "web bundle present"
 [[ -f config/extensions/web/index.ts ]] || { fail "missing config/extensions/web/index.ts"; exit 1; }
@@ -107,6 +107,13 @@ for j in lifecycle/collect-metrics.js lifecycle/aggregate-week.js lifecycle/appl
 	node --check "$j" || { fail "$j syntax"; exit 1; }
 done
 ok "lifecycle + CLI + vault node syntax clean"
+
+header "sync node syntax"
+for j in sync/cli.js sync/lib/paths.js sync/lib/gitignore.js sync/lib/hookrun.js sync/lib/repo.js sync/lib/profile.js sync/lib/consolidate.js; do
+	[[ -f "$j" ]] || { fail "missing $j"; exit 1; }
+	node --check "$j" || { fail "$j syntax"; exit 1; }
+done
+ok "sync node syntax"
 
 header "ingress node + shell syntax"
 bash -n ingress/schedule.sh || { fail "ingress/schedule.sh syntax"; exit 1; }

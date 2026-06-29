@@ -128,6 +128,7 @@ plan, navigate back.
 | `/vault add` · `list` · `get` · `remove` · `rotate` · `lock` | encrypted, trace-free credential store (see [Credential Vault](#credential-vault)) |
 | `/vault export <id>` · `export-to <id>` | bridge a key into `auth.json` or your own `vault.exportCmd` |
 | `/voice` (or **Ctrl+Shift+V**) | type ⇄ talk, on-device (see [Voice mode](#voice-mode-type--talk)) |
+| `/sync status` · `push` · `pull` · `consolidate` | multi-device config sync (see [Config sync](#config-sync-multi-device)) |
 | `/decompose` · `/spec` · `/redteam` · `/design` | the four methodology prompts |
 | `/skill:self-assess` | re-tune the config to your current model |
 
@@ -297,6 +298,35 @@ bash ~/.apple-pi/lifecycle/voice-enable.sh --check  # status only
 
 If you try `/voice` before enabling, apple-pi prints that command instead of
 launching a dead session.
+
+## Config sync (multi-device)
+
+Keep the **portable** part of `~/.pi` (skills, extensions, prompts, the
+agent contract, learnings, portable settings tuning) in a private git repo so
+it moves between machines. Secrets (`auth.json`, the credential vault,
+`sessions/`, the browser profile) **never leave the device** — by
+construction: a default-deny `.gitignore` plus a cross-platform pre-commit
+hook that blocks secret paths AND scans staged content for real provider key
+shapes.
+
+```sh
+apple-pi sync init               # origin device → main (creates a private repo via gh)
+apple-pi sync status             # what's unpushed + advisory secret scan
+apple-pi sync push               # commit + push portable changes
+apple-pi sync pull               # fetch + ff-only; merges portable settings
+apple-pi sync doctor             # health + FULL-GIT-HISTORY secret scan
+apple-pi sync consolidate <branch>   # fold another device's branch in (stage + print)
+```
+
+`settings.json` is split: device-specific paths/model stay local; a portable
+extract merges on pull, preserving device fields byte-for-byte.
+
+**Multi-device:** `init` on the origin, clone into `~/.pi` on each other
+device, `git config core.hooksPath .githooks`, then push. To fold another
+device's improvements in, `apple-pi sync consolidate <branch>` stages the
+portable changes and prints the commit/push commands for review (never
+auto-commits). See the `config-sync` skill for the full workflow and the
+[design spec](.docs/decisions/2026-06-28-config-sync-feature.md).
 
 ## `install.sh` flags
 
