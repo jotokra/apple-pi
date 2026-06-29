@@ -23,6 +23,7 @@ has the exhaustive list; this is the part you'll actually type.
 | `/branch` | checkpoint the current plan as a new branch |
 | `/tree` | navigate the session tree |
 | `/vault …` | key management (below) |
+| `/sync …` | multi-device config sync (see below) |
 
 ## `/vault` — the credential vault
 
@@ -40,11 +41,34 @@ has the exhaustive list; this is the part you'll actually type.
 
 Headless equivalents use `apple-pi vault …` with the secret on **stdin**.
 
+## `/sync` — multi-device config sync
+
+Keep the portable part of `~/.pi` (skills, extensions, prompts, the agent
+contract, learnings) in a private git repo so it moves between machines.
+Secrets (`auth.json`, the vault, `sessions/`, the browser profile) **never
+leave the device** — by construction (default-deny gitignore + a secret-
+blocking pre-commit hook), not by discipline.
+
+| | |
+|---|---|
+| `/sync status` | branch, remote, hook health, dirty portable, unpushed |
+| `/sync push` | commit + push portable changes (pre-flight secret scan) |
+| `/sync pull` | fetch + ff-only; merges portable settings, keeps device fields |
+| `/sync doctor` | health + full-git-history secret scan |
+| `/sync consolidate <branch>` | fold another device's branch in (stage + print) |
+
+`/sync init` sets up the origin device (`main`). Other devices clone into
+`~/.pi`, install the hook (`git config core.hooksPath .githooks`), and push.
+`settings.json` is split: device-specific paths/model stay local; a portable
+extract merges on pull. See the `config-sync` skill for the consolidation
+workflow.
+
 ## `apple-pi` — the product CLI
 
 | | |
 |---|---|
 | `apple-pi vault …` | vault operations (scriptable; secret on stdin) |
+| `apple-pi sync …` | config sync (`init`/`status`/`push`/`pull`/`doctor`/`consolidate`) |
 | `apple-pi update --check` | check for a new release (read-only) |
 | `apple-pi update --all --yes` | apply a release update |
 | `apple-pi review` | show the weekly self-improvement brief |
