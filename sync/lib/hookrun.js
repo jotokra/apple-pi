@@ -86,9 +86,14 @@ function runHook(opts = {}) {
 }
 
 /** CLI entry: print reasons to stderr, exit non-zero if blocked. Used by the
- *  `apple-pi sync hook-run` command (S-3). */
+ *  `apple-pi sync hook-run` command (S-3). The git hook fires with GIT_DIR
+ *  set, so resolve the actual repo root from git — NOT process.cwd()
+ *  (which is the apple-pi install dir when invoked via the wrapper). */
 function runHookCli() {
-	const { blocked, reasons } = runHook();
+	const { spawnSync } = require("node:child_process");
+	const toplevel = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).stdout;
+	const dir = (toplevel || "").trim() || process.cwd();
+	const { blocked, reasons } = runHook({ dir });
 	if (blocked) {
 		console.error("pre-commit: BLOCKED — refusing commit (secret staged).");
 		for (const r of reasons) console.error("  - " + r);
