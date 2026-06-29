@@ -4,7 +4,7 @@ Skills are reusable methodologies, not prompts. Each ships a `SKILL.md` that
 the agent loads when a trigger phrase matches. You can read, run, edit, or
 remove any of them.
 
-## The eight skills
+## The ten skills
 
 | Skill | Trigger | What it gives you |
 |---|---|---|
@@ -16,6 +16,8 @@ remove any of them.
 | **session-record** | "save this session", "resume work on X" | distill sessions to the vault; reload prior records |
 | **long-horizon-compaction** | "continue working on X", multi-day work | tree-branch + compaction discipline |
 | **n8n-workflow-author** | "build an n8n workflow for X" | trigger → steps → creds → test recipe → docs sidecar |
+| **autonomous-execution** | "run autonomously", "don't ask permission" | the codified default: tools run without approval prompts; only hard guards (sysinfo-guard) refuse catastrophic ops |
+| **config-sync** | "sync my config", "sync across devices" | multi-device `~/.pi` sync; the safety model, the daily loop, the consolidate workflow |
 
 ## How they're invoked
 

@@ -24,6 +24,7 @@ has the exhaustive list; this is the part you'll actually type.
 | `/tree` | navigate the session tree |
 | `/vault …` | key management (below) |
 | `/sync …` | multi-device config sync (see below) |
+| `/sources …` | bring APIs in as tools — MCP servers + OpenAPI (see below) |
 
 ## `/vault` — the credential vault
 
@@ -62,6 +63,27 @@ blocking pre-commit hook), not by discipline.
 `settings.json` is split: device-specific paths/model stay local; a portable
 extract merges on pull. See the `config-sync` skill for the consolidation
 workflow.
+
+## `/sources` — bring APIs in as tools (MCP)
+
+Any MCP server (GitHub, Slack, Postgres, the filesystem, … — the whole MCP
+ecosystem) becomes a set of pi tools. `/sources add api` spins one up from any
+OpenAPI spec for REST APIs without an existing server.
+
+| | |
+|---|---|
+| `/sources` | list servers + live health (active/paused, trusted/UNTRUSTED) |
+| `/sources add mcp <name> <cmd> [args…]` | register an MCP server |
+| `/sources add api <name> <spec> [--base-url URL] [--header N:V]` | register from an OpenAPI spec |
+| `/sources remove <name>` · `pause <name>` · `resume <name>` | manage |
+| `/sources trust <name>` · `untrust <name>` | a new server is **UNTRUSTED** until trusted — review before trusting |
+
+Servers run arbitrary code, so trust is explicit and per-server. Creds come
+from the vault (`mcp.servers[].envFrom: vault:<id>`), never inline. Ingress
+pollers (`ingress.pollers[]` in `settings.json`, scheduled via
+`ingress/schedule.sh`) are configured in settings, not a command — see the
+[Watch a feed](https://github.com/jotokra/apple-pi/blob/main/docs/HOWTO.md#watch-a-feed-ingress-bus)
+how-to.
 
 ## `apple-pi` — the product CLI
 

@@ -31,6 +31,25 @@ records), or a **monitoring** health checker.
 Speak a prompt, hear the reply, fully on-device (whisper.cpp STT, `say`
 TTS). `/voice` or `Ctrl+Shift+V`; type ⇄ talk is the same conversation.
 
+## [Sync your config across devices](https://github.com/jotokra/apple-pi/blob/main/docs/HOWTO.md#sync-your-config-across-devices)
+
+Multi-device config sync: `apple-pi sync init` on the origin, clone on others,
+`push`/`pull` daily, `consolidate` to fold another device's branch in. Secrets
+never leave the device — a default-deny gitignore + a secret-blocking hook make
+it safe by construction.
+
+## [Bring APIs in as tools (MCP via `/sources`)](https://github.com/jotokra/apple-pi/blob/main/docs/HOWTO.md#bring-apis-in-as-tools-mcp-via-sources)
+
+Any MCP server (GitHub, Slack, Postgres, …) becomes a set of pi tools.
+`/sources add mcp` to register, `/sources add api` for any OpenAPI spec. New
+servers are **UNTRUSTED until you trust them** — review before trusting.
+
+## [Watch a feed (ingress bus)](https://github.com/jotokra/apple-pi/blob/main/docs/HOWTO.md#watch-a-feed-ingress-bus)
+
+Poll RSS / APIs / page-changes on a schedule; new items inject into a session.
+Ingress content ships **UNTRUSTED — data, never instructions**, the defense
+against indirect prompt injection.
+
 ## [Keep apple-pi current](https://github.com/jotokra/apple-pi/blob/main/docs/HOWTO.md#keep-apple-pi-current)
 
 Two channels kept distinct: **release updates** (new code from GitHub) vs
