@@ -142,6 +142,11 @@ function main() {
 			const vaultCli = require(path.join(REPO, "vault", "cli.js"));
 			return vaultCli.run(rest);
 		}
+		case "sync": {
+			// config sync — delegates to sync/cli.js (multi-device ~/.pi sync).
+			const syncCli = require(path.join(REPO, "sync", "cli.js"));
+			return syncCli.run(rest);
+		}
 		case "update":     return update(rest);
 		default:
 			console.error(`unknown command: ${cmd} (try 'apple-pi help')`);

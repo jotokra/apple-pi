@@ -1,0 +1,26 @@
+#!/bin/sh
+# sync/hook/pre-commit — installed into the config repo's .githooks/.
+#
+# One-line intent: delegate to `apple-pi sync hook-run` (which calls
+# sync/lib/hookrun.js → sync/lib/paths.js). Classification authority stays in
+# ONE place; the hook never re-derives path classes.
+#
+# Resolving `apple-pi`: try PATH first, then the common install location
+# (~/.apple-pi/bin/apple-pi — where `apple-pi`'s own installer puts it). A
+# bare `exec apple-pi` fails on machines that have no global `apple-pi` on
+# PATH (the exact failure this shim hit during S-3 testing). If neither is
+# found, fail CLOSED (non-zero) — a missing backstop must not let secrets
+# through silently.
+
+AP=""
+if command -v apple-pi >/dev/null 2>&1; then
+	AP="apple-pi"
+elif [ -x "$HOME/.apple-pi/bin/apple-pi" ]; then
+	AP="$HOME/.apple-pi/bin/apple-pi"
+else
+	echo "pre-commit: apple-pi not found on PATH or at ~/.apple-pi/bin/apple-pi." >&2
+	echo "pre-commit: secret backstop unavailable — refusing to commit (fail closed)." >&2
+	echo "pre-commit: install apple-pi, or run 'apple-pi sync init' to reinstall the hook." >&2
+	exit 1
+fi
+exec "$AP" sync hook-run "$@"
