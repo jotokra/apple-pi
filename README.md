@@ -153,6 +153,7 @@ plan, navigate back.
 | `session-record` | save/resume distilled session records across days |
 | `long-horizon-compaction` | tree-structured sessions + deliberate compaction |
 | `n8n-workflow-author` | design an n8n workflow end-to-end |
+| `autonomous-execution` | the apple-pi default — agents run tools without approval prompts; hard guards (sysinfo-guard) are the only exception |
 
 ### How-to guides
 
@@ -222,7 +223,7 @@ design + attacker model:
 | Surface | Count | What |
 |---|---|---|
 | Persona | 1 | `config/agent/AGENTS.md` — the contract every session loads |
-| Skills | 8 | plan-decompose, read-docs-first, verify-own-work, red-blue, long-horizon-compaction, **self-assess**, session-record, n8n-workflow-author |
+| Skills | 9 | plan-decompose, read-docs-first, verify-own-work, red-blue, long-horizon-compaction, **self-assess**, session-record, n8n-workflow-author, **autonomous-execution** |
 | Prompts | 4 | `/decompose`, `/spec`, `/redteam`, `/design` |
 | Extensions | 9 | sysinfo-guard (always on), **web** (search/fetch/browser, default on), **voice** (`/voice` ↔ pivoice), **credential-vault** (on demand, env-configured), n8n/forgejo/netbird/llm/kanban/telegram (on demand) |
 | Wizard | 1 | `install.sh` + `lib/` (P0–P1 + handoff) |

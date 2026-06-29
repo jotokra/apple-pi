@@ -20,10 +20,10 @@ for f in install.sh README.md LICENSE .gitignore .docs/PLAN.md \
 done
 ok "required files"
 
-header "skills (8 SKILL.md)"
+header "skills (9 SKILL.md)"
 count=$(find config/skills -type f -name SKILL.md | wc -l | tr -d ' ')
-[[ "$count" -eq 8 ]] || { fail "expected 8 skills, got $count"; exit 1; }
-ok "8 skills"
+[[ "$count" -eq 9 ]] || { fail "expected 9 skills, got $count"; exit 1; }
+ok "9 skills"
 
 header "prompts (4)"
 count=$(find config/prompts -type f -name '*.md' | wc -l | tr -d ' ')

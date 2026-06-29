@@ -36,8 +36,8 @@ for d in skills prompts extensions agent; do
 	[[ -d "$SANDBOX/$d" ]] || { fail "missing $SANDBOX/$d"; exit 1; }
 done
 count=$(find "$SANDBOX/skills" -name SKILL.md | wc -l | tr -d ' ')
-[[ "$count" -eq 8 ]] || { fail "expected 8 skills copied, got $count"; exit 1; }
-ok "8 skills + prompts + extensions copied"
+[[ "$count" -eq 9 ]] || { fail "expected 9 skills copied, got $count"; exit 1; }
+ok "9 skills + prompts + extensions copied"
 
 header "settings.json rendered (internal seed; carries _applepi_seed marker)"
 SETTINGS="$SANDBOX/agent/settings.json"
