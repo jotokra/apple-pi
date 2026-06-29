@@ -106,13 +106,19 @@ The classification engine (`paths.js`) is pure, side-effect-free, and the only p
 | S-2  | ✅ done | `514127b` | gitignore generator + Node secret hook; smoke green (S-2.1..2.5) |
 | S-3  | ✅ done | `b1ab96c` | `init` + repo wiring + bin dispatch; smoke green (S-3.1..3.5 incl. end-to-end commit-block). Two real bugs found+fixed by the smoke (hook shim PATH resolution; `hook-run` CWD via `git rev-parse --show-toplevel`). |
 | S-4  | ✅ done | `5f86cbe` | `push`/`pull`/`status`; smoke green (S-4.1..4.6). One real bug found+fixed (hookrun `git()` ignored the `dir` arg — push pre-flight scanned the wrong repo). |
-| S-5  | ⏳ next | — | `doctor` (health + full-history secret-scan). Pure functionality; ~1 commit. |
-| S-6  | ⏳ todo | — | `sync/lib/profile.js` settings.json portable/device split; unblocks clean consolidation. |
-| S-7  | ⏳ todo | — | `consolidate <branch>` cherry-pick picker. **OQ1 open:** auto-PR vs stage+print (spec defers; recommend stage+print for v1). |
-| S-8  | ⏳ todo | — | `config/extensions/sync.ts` `/sync` TUI; **bumps structure.sh extension count 9→10**. |
-| S-9  | ⏳ todo | — | user-facing docs (guide/*, HOWTO) + onboarding offer + `gh-config-sync` skill; **bumps skill count 8→9**. |
+| S-5  | ✅ done | `85c9d14` (pre-rebase) | `doctor` (health + full-history secret-scan). Bug fixed: device-local check printed unconditional OK. |
+| S-6  | ✅ done | `b13ada4` (pre-rebase) | `sync/lib/profile.js` settings.json split. settings.json → deviceOnly (gitignored); settings.portable.json tracked. mergePortable preserves device fields byte-for-byte. |
+| S-7  | ✅ done | `109e226` (pre-rebase) | `consolidate <branch>` — stage + print (OQ1 frozen: no auto-PR). Three-dot diff, refuses secrets, skips device-local. |
+| S-8  | ✅ done | `428fdaa` | `/sync` TUI extension. Bumps ext count 9→10. Deliberate subset of CLI (no clone/hook-run). |
+| S-9  | ✅ done | (this commit) | `config-sync` skill (bumps skill count 9→10) + user docs (README, guide/commands). Onboarding offer DEFERRED — see Open follow-ups. |
 
-**Branch:** `feat/config-sync-v2` (off current `main` `3eedff7`). All 4 sync smokes + structure.sh green, count-neutral. Push to `origin/feat/config-sync-v2` backs it up.
+**Branch:** `feat/config-sync-v2` rebased on `main` `2001394` (2026-06-29). All 8 sync smokes + structure.sh green; counts 10 skills / 10 extensions. **Feature complete for v1** (S-0..S-9). Not yet merged to `main`.
+
+## Open follow-ups (post-merge)
+
+- **Onboarding offer for sync** (deferred from S-9): a one-question prompt in the install/onboarding flow — "Sync your config to a private repo?" → `apple-pi sync init`. Touches `install.sh` / the onboarding flow, which has active parallel work; defer until that settles.
+- **`apple-pi sync clone <repo>`** (stub returns notYet): fresh-device checkout onto `device/<host>`, restores device-local from templates, never touches local secrets. The other half of the multi-device UX.
+- **Interactive TUI picker for consolidate** (currently stage + print; a richer `inquirer`-style picker could live behind `/sync consolidate`).
 
 ## Resume procedure (next session)
 
@@ -131,3 +137,4 @@ If `main` has advanced, `git rebase main` — the sync files are additive (new `
 ## Version history
 - v0.1.0 (2026-06-28) — initial spec. Cards S-1..S-9 defined; executing in dependency order.
 - v0.2.0 (2026-06-29) — S-0..S-4 shipped + verified on `feat/config-sync-v2`. Added Progress + Resume sections. Next: S-5.
+- v0.3.0 (2026-06-29) — S-5..S-9 shipped. **Feature complete for v1.** doctor (history scan), settings.json split, consolidate (stage+print), `/sync` extension, config-sync skill + docs. Onboarding offer + `clone` deferred (see Open follow-ups).
