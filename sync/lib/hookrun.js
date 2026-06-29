@@ -101,4 +101,45 @@ function runHookCli() {
 	process.exit(0);
 }
 
-module.exports = { runHook, runHookCli, KEY_SHAPES };
+/** Scan ALL blobs in full git history (every commit, not just HEAD) for real
+ *  provider key shapes. Returns findings: [{sha, file, line, match}].
+ *  This is the deep check the pre-commit hook CAN'T do — the hook only fires on
+ *  new commits, so a secret committed before the hook existed (or force-pushed
+ *  around it) is invisible to it. doctor runs this. Comments/doc lines are
+ *  skipped (false-positive hygiene), matching stagedContent(). */
+function scanHistory(dir) {
+	const { execSync } = require("node:child_process");
+	// List every blob ever, with its first-seen path. `git rev-list --all --objects`
+	// gives `<sha> <path>`; `cat-file --batch` would be the streaming way, but for
+	// a config repo (<10k blobs typically) a per-blob grep is fine and simpler.
+	let objects;
+	try {
+		objects = execSync("git rev-list --all --objects", { cwd: dir, encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
+	} catch { return []; }
+	const findings = [];
+	const seen = new Set();
+	for (const line of objects.split("\n")) {
+		if (!line.trim()) continue;
+		const sp = line.indexOf(" ");
+		const sha = line.slice(0, sp);
+		const file = line.slice(sp + 1);
+		if (!file || seen.has(sha)) continue; // skip commits-without-path + dup blobs
+		seen.add(sha);
+		// grep the blob content for key shapes; skip comment/doc lines.
+		const r = spawnSync("git", ["-C", dir, "grep", "-I", "--line-number", "-E", "-e", KEY_SHAPES, sha], { encoding: "utf8" });
+		if (r.status === 0 && r.stdout) {
+			for (const l of r.stdout.split("\n").filter(Boolean)) {
+				// git grep on a blob outputs `<sha>:<line>:<content>` (no path, since we
+				// grepped the blob directly). Reconstruct a readable line.
+				const m = l.match(/^([^:]+):([0-9]+):(.*)$/);
+				if (!m) continue;
+				const [, blobSha, lineno, content] = m;
+				if (/^\s*(\/\/|#|\*|<!--)/.test(content)) continue; // comment/doc
+				findings.push({ sha, file, line: lineno, match: content.trim() });
+			}
+		}
+	}
+	return findings;
+}
+
+module.exports = { runHook, runHookCli, scanHistory, KEY_SHAPES };

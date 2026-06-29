@@ -37,7 +37,7 @@ function help() {
   status     what.s unpushed + secret check
   push       commit + push portable changes
   pull       pull portable changes
-  doctor     (S-5) health check (remote, hook, drift, history secret scan)
+  doctor     health check (remote, hook, drift, full-history secret scan)
   consolidate BRANCH  (S-7) fold another device's branch into main
   clone URL  (later) fresh-device checkout onto a device/<host> branch
 
@@ -288,7 +288,71 @@ function pickFlag(args, ...names) {
 	return "";
 }
 
-// ---- stubs filled by later cards (S-5..S-7) ----
+// ---- doctor (S-5): health + full-history secret scan ----
+function doctorCmd() {
+	const dir = piDir();
+	const c = classify(dir);
+	const checks = [];
+	const warn = (msg) => checks.push({ level: "WARN", msg });
+	const ok = (msg) => checks.push({ level: "OK", msg });
+	const bad = (msg) => checks.push({ level: "FAIL", msg });
+
+	console.log(`apple-pi sync doctor — ${dir}\n`);
+
+	// 1. repo initialized?
+	if (repo.isRepo(dir)) ok(`git repo initialized (branch ${repo.deviceBranch(dir)})`);
+	else { bad("not a git repo — run 'apple-pi sync init'."); return report(checks); }
+
+	// 2. remote set?
+	const remote = repo.remoteUrl(dir);
+	remote ? ok(`remote set: ${remote}`) : warn("no remote — push/pull disabled. Run 'apple-pi sync init --remote URL'.");
+
+	// 3. hook active?
+	repo.hookHealthy(dir) ? ok("secret hook active (core.hooksPath=.githooks)") : warn("hook NOT active — run 'apple-pi sync init' to reinstall.");
+
+	// 4. classification drift: does the committed .gitignore match a fresh generate?
+	const fs = require("node:fs");
+	const { generate } = require("./lib/gitignore");
+	const fresh = generate(c, EXTRA_TRACKED);
+	const committed = fs.existsSync(path.join(dir, ".gitignore")) ? fs.readFileSync(path.join(dir, ".gitignore"), "utf8") : "";
+	if (committed === fresh) ok(".gitignore matches current classification (no drift)");
+	else warn(".gitignore drifts from current classification — re-run 'apple-pi sync init' (or 'sync push') to regenerate.");
+
+	// 5. device-local files tracked (they should be — reconcile, not exclude)?
+	const head = repo.git(dir, ["ls-tree", "-r", "--name-only", "HEAD"]).stdout.split("\n");
+	const missingLocal = [];
+	for (const p of c.deviceLocal) {
+		const rel = p.replace(/\/\*\*$/, "");
+		if (!head.includes(rel)) missingLocal.push(rel);
+	}
+	if (missingLocal.length) warn(`device-local not in HEAD (won't sync): ${missingLocal.join(", ")}`);
+	else ok("device-local files tracked (committed, reconcile per-device)");
+
+	// 6. THE DEEP CHECK: full-git-history secret scan.
+	console.log("  scanning full git history for leaked key shapes…");
+	const { scanHistory } = require("./lib/hookrun");
+	const findings = scanHistory(dir);
+	if (findings.length === 0) ok("no provider key shapes in git history");
+	else {
+		bad(`${findings.length} potential key-shape finding(s) in git history:`);
+		for (const f of findings.slice(0, 20)) {
+			console.error(`    ${f.file}:${f.line} (${f.sha.slice(0, 8)})  ${f.match.slice(0, 60)}`);
+		}
+		console.error("    If any is a real key: rotate it now, then `git filter-repo` / BFG to purge history.");
+	}
+
+	return report(checks);
+}
+
+function report(checks) {
+	const fails = checks.filter((c) => c.level === "FAIL").length;
+	const warns = checks.filter((c) => c.level === "WARN").length;
+	for (const c of checks) console.log(`  [${c.level}] ${c.msg}`);
+	console.log(`\n${fails ? `${fails} FAIL` : "all checks passed"}${warns ? `, ${warns} WARN` : ""}.`);
+	return fails ? 1 : 0;
+}
+
+// ---- stubs filled by later cards (S-6..S-7) ----
 function notYet(cmd) {
 	console.error(`'apple-pi sync ${cmd}' ships in a later card (see the config-sync feature spec).`);
 	return 1;
@@ -307,7 +371,7 @@ function run(args) {
 		case "status":   return statusCmd();
 		case "push":     return pushCmd(rest);
 		case "pull":     return pullCmd(rest);
-		case "doctor":
+		case "doctor":   return doctorCmd();
 		case "consolidate":
 		case "clone":
 			return notYet(cmd);
