@@ -109,7 +109,7 @@ done
 ok "lifecycle + CLI + vault node syntax clean"
 
 header "sync node syntax"
-for j in sync/cli.js sync/lib/paths.js sync/lib/gitignore.js sync/lib/hookrun.js sync/lib/repo.js sync/lib/profile.js; do
+for j in sync/cli.js sync/lib/paths.js sync/lib/gitignore.js sync/lib/hookrun.js sync/lib/repo.js sync/lib/profile.js sync/lib/consolidate.js; do
 	[[ -f "$j" ]] || { fail "missing $j"; exit 1; }
 	node --check "$j" || { fail "$j syntax"; exit 1; }
 done

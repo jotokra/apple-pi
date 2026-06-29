@@ -38,7 +38,7 @@ function help() {
   push       commit + push portable changes
   pull       pull portable changes
   doctor     health check (remote, hook, drift, full-history secret scan)
-  consolidate BRANCH  (S-7) fold another device's branch into main
+  consolidate BRANCH   fold another device's branch in (stage + print; no auto-PR)
   clone URL  (later) fresh-device checkout onto a device/<host> branch
 
 Secrets never leave the device: auth.json, the vault, sessions, and the
@@ -367,7 +367,70 @@ function report(checks) {
 	return fails ? 1 : 0;
 }
 
-// ---- stubs filled by later cards (S-6..S-7) ----
+// ---- consolidate (S-7): fold a device branch in (stage + print) ----
+function consolidateCmd(args) {
+	const dir = piDir();
+	if (!repo.isRepo(dir)) { console.error("sync: not initialized. Run 'apple-pi sync init'."); return 1; }
+	const branch = args.find((a) => !a.startsWith("-"));
+	if (!branch) { console.error("usage: apple-pi sync consolidate <branch>  (e.g. origin/device/phone)"); return 2; }
+	if (!repo.remoteUrl(dir)) { console.error("sync: no remote set."); return 1; }
+
+	// Fetch so the branch ref is current, then plan.
+	repo.fetch(dir);
+	const con = require("./lib/consolidate");
+	const here = repo.deviceBranch(dir);
+	const plan = con.planConsolidation(dir, branch, here);
+
+	console.log(`apple-pi sync consolidate — ${branch} → ${here}`);
+	console.log(`  merge-base: ${con.mergeBase(dir, here, branch).slice(0, 8)}`);
+	console.log(`  changes since divergence: ${plan.portable.length + plan.deviceLocal.length + plan.refused.length}\n`);
+
+	if (plan.refused.length) {
+		// A secret or unknown path in the diff = the source device has a broken
+		// gitignore or force-committed a secret. Do NOT take anything; report.
+		console.error("  REFUSED — these must not merge (secret or unclassified):");
+		for (const r of plan.refused) console.error(`    [${r.status}] ${r.path}`);
+		console.error("\n  A secret here means the source device's .gitignore is stale or a secret was force-added. Fix it there first.");
+		return 1;
+	}
+
+	if (!plan.portable.length) {
+		console.log("  No portable changes to take.");
+		if (plan.deviceLocal.length) {
+			console.log("\n  Device-local files differ (reconcile manually, do NOT overwrite):"  );
+			for (const d of plan.deviceLocal) console.log(`    [${d.status}] ${d.path}`);
+		}
+		return 0;
+	}
+
+	// Stage each portable change from the other branch's version.
+	const staged = [];
+	for (const p of plan.portable) {
+		if (p.status === "D") {
+			repo.git(dir, ["rm", "--", p.path]);
+			staged.push(`-D ${p.path}`);
+		} else {
+			repo.git(dir, ["checkout", branch, "--", p.path]);
+			staged.push(`-${p.status} ${p.path}`);
+		}
+	}
+
+	console.log("  STAGED (portable, from " + branch + "):");
+	for (const s of staged) console.log("    " + s);
+	if (plan.deviceLocal.length) {
+		console.log("\n  SKIPPED (device-local — reconcile manually if the insight is portable):");
+		for (const d of plan.deviceLocal) console.log(`    [${d.status}] ${d.path}`);
+	}
+
+	// Per the frozen decision (OQ1): stage + print. Do NOT commit/push/PR.
+	console.log("\n  Review with:  git diff --cached");
+	console.log("  Then commit:  git commit -m \"chore(consolidate): fold " + branch + " into " + here + "\"");
+	console.log("  Then push:    git push");
+	console.log("\n  (sync consolidate stages only — it does not commit or push. Review first.)");
+	return 0;
+}
+
+// ---- stubs filled by later cards ----
 function notYet(cmd) {
 	console.error(`'apple-pi sync ${cmd}' ships in a later card (see the config-sync feature spec).`);
 	return 1;
@@ -387,7 +450,7 @@ function run(args) {
 		case "push":     return pushCmd(rest);
 		case "pull":     return pullCmd(rest);
 		case "doctor":   return doctorCmd();
-		case "consolidate":
+		case "consolidate": return consolidateCmd(rest);
 		case "clone":
 			return notYet(cmd);
 		default:
