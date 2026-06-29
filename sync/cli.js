@@ -139,7 +139,9 @@ function initCmd(args) {
 		console.log("  remote: (none — add one later with 'apple-pi sync init --remote URL')");
 	}
 
-	// 6. commit the portable set.
+	// 6. write the portable settings extract, then commit the portable set.
+	const profile = require("./lib/profile");
+	profile.writePortableExtract(dir);
 	const r = repo.commitAll(dir, initialCommitMsg());
 	if (r.secretBlocked) {
 		console.error("\n  !!! secret blocked at commit:");
@@ -228,6 +230,12 @@ function pushCmd(args) {
 	const branch = repo.deviceBranch(dir);
 	if (!repo.remoteUrl(dir)) { console.error("sync: no remote set. Run 'apple-pi sync init --remote URL'."); return 1; }
 
+	// S-6: refresh the portable extract from settings.json BEFORE computing
+	// dirty. If settings.json's portable fields changed, this writes
+	// settings.portable.json so it shows as a dirty portable path.
+	const profile = require("./lib/profile");
+	profile.writePortableExtract(dir);
+
 	const dirty = repo.dirtyPortable(dir);
 	const unpushed = repo.unpushedCount(dir, branch);
 
@@ -274,7 +282,14 @@ function pullCmd(args) {
 		return 1;
 	}
 	const r = repo.pull(dir, branch);
-	if (r.status === 0) { console.log(`  pulled: origin/${branch} (up to date or fast-forwarded)`); return 0; }
+	if (r.status === 0) {
+		// S-6: merge the just-pulled portable extract into local settings.json,
+		// preserving device-specific fields (sessionDir, shellPath, model, …).
+		const profile = require("./lib/profile");
+		const m = profile.applyPortableMerge(dir);
+		console.log(`  pulled: origin/${branch} (up to date or fast-forwarded)${m.changed ? " + merged portable settings" : ""}`);
+		return 0;
+	}
 	console.error(`  pull FAILED: ${r.stderr || "(see above)"}`);
 	console.error("  (if this is a non-ff history, reconcile via 'apple-pi sync consolidate' instead.)");
 	return 1;

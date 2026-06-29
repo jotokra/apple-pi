@@ -7,7 +7,9 @@
 #   S-1.2  put a known secret path in `secret` (auth.json, sessions/,
 #          browser-profile/, the vault)
 #   S-1.3  honor a custom sessionDir from settings.json (add it to secret)
-#   S-1.4  classify device-local settings.json/models.json as deviceLocal
+#   S-1.4  classify models.json as deviceLocal; settings.json as deviceOnly
+#         (S-6 evolution: settings.json split — portable extract tracked,
+#         device-specific original gitignored)
 #   S-1.5  never put a secret in portable (the red line)
 #   S-1.6  bucketOf() resolves a single path to the right bucket
 #
@@ -72,6 +74,7 @@ assert(has(c.portable, 'skills/**'), 'skills portable');
 assert(has(c.portable, 'agent/AGENTS.md'), 'AGENTS portable');
 assert(has(c.portable, 'agent/extensions/**'), 'agent/extensions portable');
 assert(has(c.portable, 'voice/**'), 'voice portable');
+assert(has(c.portable, 'agent/settings.portable.json'), 'portable settings extract (S-6)');
 
 // S-1.2 secret
 assert(has(c.secret, 'agent/auth.json'), 'agent/auth secret');
@@ -84,8 +87,10 @@ assert(c.sessionDirRel === 'custom-sessions/**', 'sessionDirRel=' + c.sessionDir
 assert(has(c.secret, 'custom-sessions/**'), 'custom sessionDir added to secret');
 
 // S-1.4 device-local
-assert(has(c.deviceLocal, 'agent/settings.json'), 'settings deviceLocal');
-assert(c.deviceLocal.includes('agent/models.json'), 'models deviceLocal');
+assert(has(c.deviceLocal, 'agent/models.json'), 'models deviceLocal');
+// S-6: settings.json moved deviceLocal → deviceOnly (device paths/model stay local)
+assert(has(c.deviceOnly, 'agent/settings.json'), 'settings.json deviceOnly (S-6)');
+assert(!c.deviceLocal.includes('agent/settings.json'), 'settings.json NOT deviceLocal anymore (S-6)');
 
 // S-1.5 red line: no secret path is also in portable
 for (const sp of c.secret) assert(!c.portable.includes(sp), 'SECRET IN PORTABLE: ' + sp);
@@ -93,7 +98,8 @@ for (const sp of c.secret) assert(!c.portable.includes(sp), 'SECRET IN PORTABLE:
 // S-1.6 bucketOf
 assert(bucketOf('agent/auth.json', c) === 'secret', 'bucketOf auth=secret');
 assert(bucketOf('skills/x/SKILL.md', c) === 'portable', 'bucketOf skill=portable');
-assert(bucketOf('agent/settings.json', c) === 'deviceLocal', 'bucketOf settings=deviceLocal');
+assert(bucketOf('agent/settings.json', c) === 'deviceOnly', 'bucketOf settings=deviceOnly (S-6)');
+assert(bucketOf('agent/settings.portable.json', c) === 'portable', 'bucketOf portable-extract=portable (S-6)');
 assert(bucketOf('agent/trust.json', c) === 'deviceOnly', 'bucketOf trust=deviceOnly');
 assert(bucketOf('random/new-file.md', c) === 'unknown', 'bucketOf new=unknown');
 

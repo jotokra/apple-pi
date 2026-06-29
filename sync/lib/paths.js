@@ -82,11 +82,14 @@ function classify(dir) {
 		"prompts/**",
 		"agent/AGENTS.md",
 		"agent/self-assessment-*.md",
+		// S-6: settings.json is split. The PORTABLE extract is tracked here;
+		// the device-specific original (agent/settings.json) is gitignored
+		// (deviceOnly below) so paths/model never leave the device.
+		"agent/settings.portable.json",
 		"voice/**",
 	];
 
 	const deviceLocal = [
-		"agent/settings.json",
 		"agent/models.json",
 	];
 
@@ -104,6 +107,7 @@ function classify(dir) {
 		"caddy-root.crt",
 		"agent/trust.json",
 		".apple-pi-source",
+		"agent/settings.json",
 	];
 
 	return {
