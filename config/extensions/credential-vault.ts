@@ -40,10 +40,13 @@
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-// pi-tui key utilities — verified exports of @earendil-works/pi-tui (see the
-// installed package's dist/keys.d.ts). Used by the masked-entry overlay (F1)
-// to parse raw terminal keystrokes without hand-rolling escape sequences.
-import { Key, matchesKey, decodePrintableKey, type TUI, type Theme, type Component } from "@earendil-works/pi-tui";
+// pi-tui key utilities re-exported from the package barrel. (matchesKey + Key
+// ARE in the barrel; decodePrintableKey is NOT — only the narrower
+// decodeKittyPrintable is, and the full version lives in dist/keys.js, which
+// pi's extension loader cannot resolve as a package subpath. The overlay
+// uses a self-contained inline decoder instead — see decodePrintableKey()
+// below — so this component never depends on a non-barrel export.)
+import { Key, matchesKey, type TUI, type Theme, type Component } from "@earendil-works/pi-tui";
 // vault-wire P1: the in-memory registry + read-only projection. The session_start
 // auto-wire and /vault wire both drive this; bridges import secret() directly.
 import { projectWire, clearCache } from "./_lib/vault-registry";
@@ -136,6 +139,47 @@ function parseArgs(args: string): { positional: string[]; flags: Record<string, 
 // Falls back to ctx.ui.input (the v1 path) when overlay capture is
 // unavailable (non-TUI mode, or custom() throws). REQ-CV-7's tracefree smoke
 // re-asserts trace-freeness regardless of which path runs.
+
+/**
+ * Decode a terminal keystroke chunk into a printable char, or undefined.
+ * Self-contained (NOT imported) because pi-tui's barrel re-exports only the
+ * narrower decodeKittyPrintable; the full decodePrintableKey lives in
+ * dist/keys.js, which (a) the barrel doesn't re-export and (b) pi's extension
+ * loader can't resolve as a subpath. Importing the barrel name silently binds
+ * to undefined and the overlay then crashes on the first keystroke with
+ * "decodePrintableKey is not a function".
+ *
+ * Handles both keyboard modes a pi TUI can run in: legacy raw bytes (what pi
+ * uses today — it never calls setKittyProtocolActive) AND Kitty CSI-u /
+ * xterm modifyOtherKeys disambiguation (future-proofing). Accepts only plain or
+ * Shift-modified keys; rejects Ctrl/Alt/Super (those are keybindings, not
+ * text). Mirrors pi-tui's decodePrintableKey = decodeKittyPrintable(data) ??
+ * decodeModifyOtherKeysPrintable(data) for the printable-only subset.
+ */
+function decodePrintableKey(data: string): string | undefined {
+	const fromCp = (cp: number): string | undefined => {
+		if (!Number.isFinite(cp) || cp < 32) return undefined;
+		try { return String.fromCodePoint(cp); } catch { return undefined; }
+	};
+	// Kitty CSI-u: ESC[<cp>[:<shifted>[:<base>]];<mod>[:<event>]u
+	const kitty = data.match(/^\x1b\[(\d+)(?::(\d*))?(?::(\d+))?(?:;(\d+))?(?::(\d+))?u$/);
+	if (kitty) {
+		const cp = Number.parseInt(kitty[1] ?? "", 10);
+		const shifted = kitty[2] && kitty[2].length > 0 ? Number.parseInt(kitty[2], 10) : undefined;
+		const mod = kitty[4] ? Number.parseInt(kitty[4], 10) - 1 : 0; // CSI-u mods are 1-indexed
+		if (mod !== 0 && mod !== 1) return undefined; // accept only none / shift (bit0)
+		return fromCp(mod === 1 && typeof shifted === "number" ? shifted : cp);
+	}
+	// xterm modifyOtherKeys: ESC[27;<mod>;<cp>~
+	const mok = data.match(/^\x1b\[27;(\d+);(\d+)~$/);
+	if (mok) {
+		const mod = Number.parseInt(mok[1], 10) - 1;
+		if (mod !== 0 && mod !== 1) return undefined;
+		return fromCp(Number.parseInt(mok[2], 10));
+	}
+	return undefined;
+}
+
 class MaskedInputOverlay implements Component {
 	private buffer = "";
 	private tui: TUI;
@@ -189,14 +233,35 @@ class MaskedInputOverlay implements Component {
 			}
 			return;
 		}
-		// printable chars (handles a multi-char paste by walking each char).
-		// decodePrintableKey rejects non-printables (ctrl/alt combos, escape
-		// sequences) so they can't pollute the buffer.
-		for (const ch of data) {
-			const p = decodePrintableKey(ch);
-			if (p) this.buffer += p;
+		// printable input — two paths:
+		//  (a) Kitty CSI-u / xterm modifyOtherKeys encode even plain keys as escape
+		//      sequences (e.g. ESC[97u = 'a'); decodePrintableKey takes the WHOLE
+		//      chunk and returns the decoded char.
+		//  (b) normal terminals send raw bytes; a paste is multiple chars.
+		// decodePrintableKey only matches whole escape sequences, so feed it the
+		// full chunk — never per-char (per-char silently drops every raw byte:
+		// the regex needs the whole ESC[…u / ESC[27;m;c~ sequence). Any chunk that
+		// still contains an ESC leader is a control sequence (arrow key / F-key /
+		// Alt+x) we didn't match above; reject it rather than letting its stray
+		// glyphs ([, A, digits…) leak into the secret buffer.
+		const decoded = decodePrintableKey(data);
+		if (decoded !== undefined) {
+			this.buffer += decoded;
+			this.tui.requestRender();
+			return;
 		}
-		if (this.buffer) this.tui.requestRender();
+		if (data.includes("\x1b")) return;
+		let appended = false;
+		for (const ch of data) {
+			const code = ch.codePointAt(0)!;
+			// printable = ASCII 0x20–0x7e, or non-ASCII >= 0xa0. Reject DEL (0x7f)
+			// and C1 controls (0x80–0x9f) so ctrl combos can't inject glyphs.
+			if ((code >= 0x20 && code <= 0x7e) || code >= 0xa0) {
+				this.buffer += ch;
+				appended = true;
+			}
+		}
+		if (appended) this.tui.requestRender();
 	}
 	private finish(result: string | undefined): void {
 		// zero the buffer, then resolve. The secret lived only on this instance.

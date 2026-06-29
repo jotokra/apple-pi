@@ -73,6 +73,18 @@ add_hits=$(grep -cE 'captureSecret\(ctx, core' "$EXT")
 # the MaskedInputOverlay component class + its render delegating to the helper exist
 grep -q "class MaskedInputOverlay" "$EXT" || { fail "MaskedInputOverlay component missing"; exit 1; }
 grep -qE 'this\.dotRow\(' "$EXT" || { fail "overlay render() does not delegate to the dotRow helper"; exit 1; }
+# REGRESSION GUARD (the 2026-06-30 crash): decodePrintableKey is NOT in the
+# pi-tui barrel (only the narrower decodeKittyPrintable is), and pi's loader
+# can't resolve dist/keys.js as a subpath. A barrel import silently binds to
+# undefined -> pi crashes with "decodePrintableKey is not a function" on the
+# FIRST keystroke in the masked overlay (load succeeds; the bomb is latent).
+# The overlay must define its own inline decoder and must NOT import the name.
+! grep -qE 'import\s*\{[^}]*\bdecodePrintableKey\b[^}]*\}\s*from\s*"@earendil-works/pi-tui"' "$EXT" \
+	|| { fail "regression: decodePrintableKey imported from pi-tui barrel (will be undefined -> keystroke crash)"; exit 1; }
+! grep -q '@earendil-works/pi-tui/dist/keys.js' "$EXT" \
+	|| { fail "regression: deep import @earendil-works/pi-tui/dist/keys.js (pi loader can't resolve this subpath)"; exit 1; }
+grep -q 'function decodePrintableKey' "$EXT" \
+	|| { fail "regression: inline decodePrintableKey() missing (overlay can't decode typed input)"; exit 1; }
 ok "captureSecret + MaskedInputOverlay wired for add + rotate"
 
 # ── 3. LOAD: extension compiles + loads under pi's real loader ────────
