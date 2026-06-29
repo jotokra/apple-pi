@@ -308,6 +308,15 @@ header "P1 · install config (no personal info)"
 _install_tree() {
 	local kind="$1"
 	if [[ -d "$REPO_DIR/config/$kind" ]]; then
+		# Respect a deliberate overlay: if the user symlinks $PI_DIR/$kind (the
+		# documented config-sync / multi-device pattern), do NOT destroy it. A
+		# blind rm-then-cp here materializes the symlink into a real dir with
+		# stale generic content — silently breaking the overlay (incident
+		# 2026-06-29). Skip with guidance instead.
+		if [[ -L "$PI_DIR/$kind" ]]; then
+			warn "$PI_DIR/$kind is a symlink (overlay/config-sync in use); skipping install of config/$kind — manage it via your overlay"
+			return
+		fi
 		rm -rf "$PI_DIR/$kind"
 		cp -R "$REPO_DIR/config/$kind" "$PI_DIR/$kind" || die "failed to copy config/$kind"
 		ok "copied config/$kind → $PI_DIR/$kind"
@@ -322,9 +331,13 @@ _install_tree extensions
 # (the same way sysinfo/voice/web load). No-op until the user adds mcp.servers
 # to their settings — the bridge waits for servers to bridge.
 if [[ -d "$REPO_DIR/mcp-bridge" ]]; then
-	rm -rf "$PI_DIR/extensions/mcp-bridge"
-	cp -R "$REPO_DIR/mcp-bridge" "$PI_DIR/extensions/mcp-bridge" || die "failed to copy mcp-bridge"
-	ok "copied mcp-bridge → $PI_DIR/extensions/mcp-bridge (opt-in: add mcp.servers to enable)"
+	if [[ -L "$PI_DIR/extensions" ]]; then
+		warn "$PI_DIR/extensions is a symlink (overlay/config-sync in use); skipping mcp-bridge install — manage it via your overlay"
+	elif [[ -d "$PI_DIR/extensions" ]]; then
+		rm -rf "$PI_DIR/extensions/mcp-bridge"
+		cp -R "$REPO_DIR/mcp-bridge" "$PI_DIR/extensions/mcp-bridge" || die "failed to copy mcp-bridge"
+		ok "copied mcp-bridge → $PI_DIR/extensions/mcp-bridge (opt-in: add mcp.servers to enable)"
+	fi
 fi
 
 # ingress extension — pollers that watch sources (RSS/webdiff/json) and inject
@@ -332,9 +345,13 @@ fi
 # pi-dir extensions tree so pi auto-discovers it. No-op until the user adds
 # ingress.pollers via /ingress add.
 if [[ -d "$REPO_DIR/ingress" ]]; then
-	rm -rf "$PI_DIR/extensions/ingress"
-	cp -R "$REPO_DIR/ingress" "$PI_DIR/extensions/ingress" || die "failed to copy ingress"
-	ok "copied ingress → $PI_DIR/extensions/ingress (opt-in: /ingress add <kind> <name> <url>)"
+	if [[ -L "$PI_DIR/extensions" ]]; then
+		warn "$PI_DIR/extensions is a symlink (overlay/config-sync in use); skipping ingress install — manage it via your overlay"
+	elif [[ -d "$PI_DIR/extensions" ]]; then
+		rm -rf "$PI_DIR/extensions/ingress"
+		cp -R "$REPO_DIR/ingress" "$PI_DIR/extensions/ingress" || die "failed to copy ingress"
+		ok "copied ingress → $PI_DIR/extensions/ingress (opt-in: /ingress add <kind> <name> <url>)"
+	fi
 fi
 
 # Voice bundle ships as a pi package (pivoice.py + bin + manifest). The bundle
