@@ -135,6 +135,7 @@ plan, navigate back.
 | `/vault export <id>` · `export-to <id>` | bridge a key into `auth.json` or your own `vault.exportCmd` |
 | `/voice` (or **Ctrl+Shift+V**) | type ⇄ talk, on-device (see [Voice mode](#voice-mode-type--talk)) |
 | `/sync status` · `push` · `pull` · `consolidate` | multi-device config sync (see [Config sync](#config-sync-multi-device)) |
+| `/sources add mcp` · `add api` · `trust` | bring APIs in as tools — any MCP server or OpenAPI spec (see [Bring APIs in as tools](#bring-apis-in-as-tools-mcp)) |
 | `/decompose` · `/spec` · `/redteam` · `/design` | the four methodology prompts |
 | `/skill:self-assess` | re-tune the config to your current model |
 
@@ -333,6 +334,33 @@ device's improvements in, `apple-pi sync consolidate <branch>` stages the
 portable changes and prints the commit/push commands for review (never
 auto-commits). See the `config-sync` skill for the full workflow and the
 [design spec](.docs/decisions/2026-06-28-config-sync-feature.md).
+
+## Bring APIs in as tools (MCP)
+
+apple-pi speaks **MCP** (Model Context Protocol) — the open "one agent, all
+APIs" standard. Any MCP server (GitHub, Slack, Postgres, the filesystem, … —
+hundreds exist) becomes a set of pi tools, automatically named and described.
+For REST APIs without a server, `/sources add api` spins one up from any
+OpenAPI spec.
+
+```sh
+/sources                              # list + health (active/paused, trusted/UNTRUSTED)
+/sources add mcp github npx -y @mcp/server-github
+/sources add api petstore ./petstore.json --base-url https://petstore.example.com
+/sources trust github                 # new servers are UNTRUSTED until you trust them
+/sources pause github · resume github · remove github
+```
+
+**Trust model:** MCP servers run arbitrary code, so a newly added server is
+**UNTRUSTED** — its tools won't spawn until you `/sources trust <name>`.
+Treat `/sources add` like `npm install`: review before trusting. Creds come
+from the vault (`mcp.servers[].envFrom: vault:<id>`), never inline.
+
+**Ingress** (the world flowing *in*) is configured in `settings.json`
+(`ingress.pollers[]`: RSS / JSON / page-change on a schedule, wired via
+`ingress/schedule.sh install`). Ingress content ships **UNTRUSTED — data,
+never instructions** — the defense against indirect prompt injection. See the
+[Watch a feed how-to](docs/HOWTO.md#watch-a-feed-ingress-bus).
 
 ## `install.sh` flags
 
