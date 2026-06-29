@@ -34,9 +34,9 @@ function help() {
           secret hook, create/link a private GitHub repo (gh) or --remote,
           commit the portable set, push.
   hook-run   run the pre-commit secret backstop (the git hook calls this)
-  status     (S-4) what's unpushed + secret check
-  push       (S-4) commit + push portable changes
-  pull       (S-4) pull portable changes
+  status     what.s unpushed + secret check
+  push       commit + push portable changes
+  pull       pull portable changes
   doctor     (S-5) health check (remote, hook, drift, history secret scan)
   consolidate BRANCH  (S-7) fold another device's branch into main
   clone URL  (later) fresh-device checkout onto a device/<host> branch
@@ -189,9 +189,108 @@ function docStub(which) {
 	return "# CONSOLIDATION.md\n\nFold other devices' branches into `main`. See `apple-pi sync consolidate`.\n";
 }
 
-// ---- stubs filled by later cards (S-4..S-7) ----
+// ---- status / push / pull (S-4) ----
+
+function statusCmd() {
+	const dir = piDir();
+	if (!repo.isRepo(dir)) {
+		console.log("sync: not initialized. Run 'apple-pi sync init'.");
+		return 1;
+	}
+	const branch = repo.deviceBranch(dir);
+	const remote = repo.remoteUrl(dir) || "(none)";
+	const hookOk = repo.hookHealthy(dir);
+	const dirty = repo.dirtyPortable(dir);
+	const unpushed = repo.unpushedCount(dir, branch);
+	const c = classify(dir);
+
+	console.log(`apple-pi sync status — ${dir}`);
+	console.log(`  branch: ${branch}`);
+	console.log(`  remote: ${remote}`);
+	console.log(`  hook:   ${hookOk ? "active (core.hooksPath)" : "NOT active — run 'apple-pi sync init' to reinstall"}`);
+	console.log(`  portable changes uncommitted: ${dirty.length}${dirty.length ? " (" + dirty.slice(0, 5).join(", ") + (dirty.length > 5 ? ", …" : "") + ")" : ""}`);
+	console.log(`  commits unpushed:            ${unpushed}`);
+	// pre-flight secret check on the working tree (advisory).
+	const { runHook } = require("./lib/hookrun");
+	console.log(`  secret scan (staged):         ${(() => { const r = runHook({ dir }); return r.blocked ? "⚠ " + r.reasons.length + " secret(s) staged" : "clean"; })()}`);
+	if (unpushed > 0 || dirty.length > 0) {
+		console.log(`\n  → 'apple-pi sync push' to commit + push ${dirty.length ? "your " + dirty.length + " portable change(s)" : ""}${dirty.length && unpushed ? " and " : ""}${unpushed ? unpushed + " unpushed commit(s)" : ""}.`);
+	} else {
+		console.log("\n  ✓ in sync.");
+	}
+	return 0;
+}
+
+function pushCmd(args) {
+	const dir = piDir();
+	if (!repo.isRepo(dir)) { console.error("sync: not initialized. Run 'apple-pi sync init'."); return 1; }
+	const message = pickFlag(args, "--message", "-m") || `chore(sync): portable update from ${os.hostname().split(".")[0]}`;
+	const branch = repo.deviceBranch(dir);
+	if (!repo.remoteUrl(dir)) { console.error("sync: no remote set. Run 'apple-pi sync init --remote URL'."); return 1; }
+
+	const dirty = repo.dirtyPortable(dir);
+	const unpushed = repo.unpushedCount(dir, branch);
+
+	// ALWAYS pre-flight the secret scan — even on a clean tree, a force-staged
+	// secret must not slip through the "nothing to push" exit (S-4.3).
+	const { runHook } = require("./lib/hookrun");
+	const prescan = runHook({ dir });
+	if (prescan.blocked) {
+		console.error("sync push: BLOCKED — secret in the staged set:");
+		prescan.reasons.forEach((x) => console.error("  - " + x));
+		return 1;
+	}
+
+	if (!dirty.length && !unpushed) { console.log("sync: nothing to push (clean, in sync)."); return 0; }
+
+	let committed = false;
+	if (dirty.length) {
+		// refresh .gitignore in case the classification changed (new path added)
+		repo.writeGitignore(dir, EXTRA_TRACKED);
+		const r = repo.commitAll(dir, message);
+		if (r.secretBlocked) {
+			console.error("sync push: BLOCKED — secret in the staged set:");
+			r.reasons.forEach((x) => console.error("  - " + x));
+			return 1;
+		}
+		committed = r.committed;
+		console.log(`  committed: ${committed ? dirty.length + " portable change(s)" : "(nothing staged)"}`);
+	}
+	const p = repo.push(dir, branch);
+	if (p.status === 0) { console.log(`  pushed: origin/${branch}`); return 0; }
+	console.error(`  push FAILED: ${p.stderr || "(see above)"}`);
+	return 1;
+}
+
+function pullCmd(args) {
+	const dir = piDir();
+	if (!repo.isRepo(dir)) { console.error("sync: not initialized. Run 'apple-pi sync init'."); return 1; }
+	if (!repo.remoteUrl(dir)) { console.error("sync: no remote set."); return 1; }
+	const branch = repo.deviceBranch(dir);
+	repo.fetch(dir);
+	const unpushed = repo.unpushedCount(dir, branch);
+	if (unpushed > 0) {
+		console.error(`sync: ${unpushed} local commit(s) not pushed — push first (pull would diverge).`);
+		return 1;
+	}
+	const r = repo.pull(dir, branch);
+	if (r.status === 0) { console.log(`  pulled: origin/${branch} (up to date or fast-forwarded)`); return 0; }
+	console.error(`  pull FAILED: ${r.stderr || "(see above)"}`);
+	console.error("  (if this is a non-ff history, reconcile via 'apple-pi sync consolidate' instead.)");
+	return 1;
+}
+
+/** Pull a `--flag value` (or `-f value`) from args; returns value or "". */
+function pickFlag(args, ...names) {
+	for (let i = 0; i < args.length; i++) {
+		if (names.includes(args[i])) return args[i + 1] || "";
+	}
+	return "";
+}
+
+// ---- stubs filled by later cards (S-5..S-7) ----
 function notYet(cmd) {
-	console.error(`'apple-pi sync ${cmd}' ships in a later card (see .docs/decisions/2026-06-28-config-sync-feature.md).`);
+	console.error(`'apple-pi sync ${cmd}' ships in a later card (see the config-sync feature spec).`);
 	return 1;
 }
 
@@ -205,9 +304,9 @@ function run(args) {
 			return help(), 0;
 		case "init":     return initCmd(rest);
 		case "hook-run": return runHookCli();
-		case "status":
-		case "push":
-		case "pull":
+		case "status":   return statusCmd();
+		case "push":     return pushCmd(rest);
+		case "pull":     return pullCmd(rest);
 		case "doctor":
 		case "consolidate":
 		case "clone":
