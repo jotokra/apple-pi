@@ -97,6 +97,7 @@ function classify(dir) {
 		"auth.json",
 		"agent/auth.json",
 		"agent/credentials.vault",
+		"agent/env.local",
 		"sessions/**",
 		"agent/sessions/**",
 		browserProfileRel,

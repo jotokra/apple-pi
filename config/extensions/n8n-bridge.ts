@@ -7,7 +7,8 @@
  *   n8n_create_workflow_json  → POST/PUT a workflow JSON (create or update)
  *   n8n_healthz               → GET /healthz
  *
- * Configuration (env vars — NO defaults baked in):
+ * Configuration (env vars — NO defaults baked in; or device-local
+ *   agent/env.local KEY=VALUE, see _lib/envlocal.ts):
  *   N8N_BASE_URL  — your n8n root, e.g. https://n8n.example.com
  *   N8N_API_KEY   — an n8n API key (Settings → API)
  *
@@ -16,6 +17,7 @@
  * than guessing an endpoint.
  */
 
+import "./_lib/envlocal"; // device-local env overrides (agent/env.local)
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 

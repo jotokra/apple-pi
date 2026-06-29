@@ -1,7 +1,7 @@
 #!/bin/bash
 # smoke/run.sh — the apple-pi smoke suite.
 #   bash smoke/run.sh           # all
-#   bash smoke/run.sh <name>    # one of: sanitize, structure, onboard-sandbox
+#   bash smoke/run.sh <name>    # one of: sanitize, structure, onboard-sandbox, ...
 
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +20,7 @@ run_one() {
 
 FAILED=0
 if [[ "$target" == "all" ]]; then
-	for s in sanitize structure onboard-sandbox vault-roundtrip vault-tracefree vault-telemetry-safe vault-rotate-import-export vault-onboarding vault-masked-overlay vault-export-to vault-failclosed voice-integration mcp-bridge mcp-bridge-ext mcp-sources mcp-envfrom mcp-injection sync-paths sync-gitignore sync-init sync-pushpull sync-doctor sync-profile sync-consolidate sync-extension mcp-openapi ingress-poller ingress-injection ingress-command ingress-schedule docs-build; do run_one "$s"; done
+	for s in sanitize structure onboard-sandbox vault-roundtrip vault-tracefree vault-telemetry-safe vault-rotate-import-export vault-onboarding vault-masked-overlay vault-export-to vault-failclosed voice-integration mcp-bridge mcp-bridge-ext mcp-sources mcp-envfrom mcp-injection sync-paths sync-gitignore sync-init sync-pushpull sync-doctor sync-profile sync-consolidate sync-extension envlocal sidecar-alias mcp-openapi ingress-poller ingress-injection ingress-command ingress-schedule docs-build; do run_one "$s"; done
 else
 	run_one "$target"
 fi
