@@ -8,7 +8,8 @@
  * Use this when the primary model is uncertain and you want a second
  * opinion from a DIFFERENT model. It is never the primary path.
  *
- * Configuration (env vars — NO defaults baked in):
+ * Configuration (env vars — NO defaults baked in; or device-local
+ *   agent/env.local KEY=VALUE, see _lib/envlocal.ts):
  *   LLM_SIDECAR_URL   — e.g. https://llm.example.com/anthropic
  *                        (an auth-injecting proxy you control, or a direct
  *                        Anthropic-compatible endpoint)
@@ -19,6 +20,7 @@
  * Enabled on demand.
  */
 
+import "./_lib/envlocal"; // device-local env overrides (agent/env.local)
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 

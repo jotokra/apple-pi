@@ -12,7 +12,8 @@
  *            started_at, completed_at
  *   status values: triage, in_progress, blocked, review, done
  *
- * Configuration (env vars — NO defaults baked in):
+ * Configuration (env vars — NO defaults baked in; or device-local
+ *   agent/env.local KEY=VALUE, see _lib/envlocal.ts):
  *   KANBAN_DB_PATH  — absolute path to the SQLite DB
  *   KANBAN_TABLE    — table name (default "tasks")
  *   KANBAN_ACTOR    — created_by value on insert (default "apple-pi")
@@ -22,6 +23,7 @@
  * degrade gracefully: a missing column is reported, not silently ignored.
  */
 
+import "./_lib/envlocal"; // device-local env overrides (agent/env.local)
 import { DatabaseSync } from "node:sqlite";
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
