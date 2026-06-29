@@ -44,6 +44,9 @@ import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-c
 // installed package's dist/keys.d.ts). Used by the masked-entry overlay (F1)
 // to parse raw terminal keystrokes without hand-rolling escape sequences.
 import { Key, matchesKey, decodePrintableKey, type TUI, type Theme, type Component } from "@earendil-works/pi-tui";
+// vault-wire P1: the in-memory registry + read-only projection. The session_start
+// auto-wire and /vault wire both drive this; bridges import secret() directly.
+import { projectWire, clearCache } from "./_lib/vault-registry";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -454,6 +457,7 @@ async function cmdUnlock(ctx: ExtensionCommandContext, core: any): Promise<void>
 function cmdLock(ctx: ExtensionCommandContext, core: any, args: string): void {
 	const { flags } = parseArgs(args);
 	cachedPass = null;
+	clearCache(); // also drop the vault-wire registry so secrets stop resolving
 	if (flags["keychain"] !== undefined) {
 		const ok = core.keychainDelete();
 		ctx.ui.notify(
@@ -465,11 +469,33 @@ function cmdLock(ctx: ExtensionCommandContext, core: any, args: string): void {
 	ctx.ui.notify("vault: passphrase forgotten for this session — re-prompt next /vault use (add --keychain to also remove the stored keychain entry)", "info");
 }
 
+// REQ-VW-8: `/vault wire` — preview (--dry-run, the default) or run (--apply) the
+// vault.wire projection. Reuses the session's cached passphrase if unlocked, else
+// the registry resolves headlessly (env/keychain). Shows one line per entry
+// (id + surface; never the secret) via a dismissable list.
+async function cmdWire(ctx: ExtensionCommandContext, _core: any, args: string): Promise<void> {
+	const dryRun = !args.includes("--apply");
+	const lines: string[] = [];
+	const res = await projectWire({
+		dryRun,
+		passphrase: cachedPass || undefined, // reuse an unlocked passphrase; else registry resolves
+		log: (m) => lines.push(m),
+	});
+	if (!lines.length) lines.push("(no vault.wire entries configured — add a `vault.wire` map to settings.json)");
+	const head = dryRun ? `vault wire — DRY RUN (no writes; --apply to project)` : `vault wire — applied`;
+	const summary =
+		`${res.auth.length} auth, ${res.command.length} command, ${res.bridge.length} bridge` +
+		(res.missing.length ? `, ${res.missing.length} missing` : "") +
+		(res.errors.length ? `, ${res.errors.length} error(s)` : "");
+	ctx.ui.notify(`${head} — ${summary}`, res.errors.length ? "warning" : "info");
+	await ctx.ui.select(`${head} — ${summary}`, lines);
+}
+
 // ── registration ──────────────────────────────────────────────────────
 export default function credentialVaultExtension(pi: ExtensionAPI): void {
-	const SUBS = ["add", "list", "get", "remove", "rotate", "import", "export", "export-to", "lock", "unlock", "prune-transient"];
+	const SUBS = ["add", "list", "get", "remove", "rotate", "import", "export", "export-to", "lock", "unlock", "wire", "prune-transient"];
 	pi.registerCommand("vault", {
-		description: "Encrypted credential vault (add/list/get/remove/rotate/import/export/lock/unlock)",
+		description: "Encrypted credential vault (add/list/get/remove/rotate/import/export/lock/unlock/wire)",
 		getArgumentCompletions: (prefix) => {
 			const hits = SUBS.filter((s) => s.startsWith(prefix));
 			return hits.length ? hits.map((s) => ({ value: s, label: s })) : null;
@@ -484,9 +510,9 @@ export default function credentialVaultExtension(pi: ExtensionAPI): void {
 			const sub = (sp >= 0 ? trimmed.slice(0, sp) : trimmed) || "list";
 			const rest = sp >= 0 ? trimmed.slice(sp + 1) : "";
 
-			// lock + unlock manage the passphrase themselves and skip the upfront gate;
+			// lock + unlock + wire manage the passphrase themselves and skip the upfront gate;
 			// list will prompt via getPassphrase below.
-			if (sub !== "lock" && sub !== "unlock") {
+			if (sub !== "lock" && sub !== "unlock" && sub !== "wire") {
 				const pass = await getPassphrase(ctx, core);
 				if (!pass) return;
 				try { core.ensureVault(pass); }
@@ -505,9 +531,22 @@ export default function credentialVaultExtension(pi: ExtensionAPI): void {
 				case "prune-transient":  return cmdPruneTransient(ctx, core);
 				case "lock":             return cmdLock(ctx, core, rest);
 				case "unlock":           return cmdUnlock(ctx, core);
+				case "wire":             return cmdWire(ctx, core, rest);
 				default:
-					ctx.ui.notify(`vault: unknown subcommand "${sub}" — try add/list/get/remove/rotate/import/export/lock/unlock`, "warning");
+					ctx.ui.notify(`vault: unknown subcommand "${sub}" — try add/list/get/remove/rotate/import/export/lock/unlock/wire`, "warning");
 			}
 		},
+	});
+
+	// REQ-VW-5: the auto-wire. On session start (and reload), decrypt the vault
+	// once and project vault.wire → auth.json / bridges / commands. Fire-and-forget
+	// (NOT awaited) so a slow/hung external command can't delay startup; exportToCommand
+	// has its own 10s timeout. Read-only on the vault, never process.env (C-1/C-2).
+	// No passphrase yet (no keychain/env) → projectWire degrades to a no-op (R-VW-4).
+	pi.on("session_start", (event, ctx) => {
+		if (event.reason !== "startup" && event.reason !== "reload") return;
+		projectWire({ log: () => {} }).catch((e) => {
+			try { ctx.ui.notify(`vault wire: ${e?.message || String(e)}`, "warning"); } catch { /* non-TUI ctx */ }
+		});
 	});
 }
