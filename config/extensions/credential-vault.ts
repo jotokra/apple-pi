@@ -209,6 +209,21 @@ class MaskedInputOverlay implements Component {
 	// REQUIRED (no-op; the overlay has no cached render state beyond `buffer`).
 	invalidate(): void { /* stateless beyond this.buffer */ }
 	handleInput(data: string): void {
+		// Defense-in-depth: pi-core's TUI.handleInput (pi-tui dist/tui.js)
+		// dispatches to the focused component with NO try/catch — any throw
+		// here becomes an uncaughtException that kills pi mid-secret-entry
+		// (the historic crash was decodePrintableKey resolving to an undefined
+		// pi-tui barrel export; that symbol bug is fixed, but this guard makes
+		// the handler TOTAL against ANY future throw). On error: drop the
+		// offending keystroke, keep the overlay + pi alive, re-render. Never
+		// call finish() from the catch — a degraded keystroke-drop beats a crash.
+		try {
+			this.handleInputUnsafe(data);
+		} catch {
+			this.tui.requestRender();
+		}
+	}
+	private handleInputUnsafe(data: string): void {
 		// submit
 		if (matchesKey(data, Key.enter) || matchesKey(data, Key.return)) {
 			this.finish(this.buffer);
