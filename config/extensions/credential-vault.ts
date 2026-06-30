@@ -224,8 +224,19 @@ class MaskedInputOverlay implements Component {
 		}
 	}
 	private handleInputUnsafe(data: string): void {
-		// submit
-		if (matchesKey(data, Key.enter) || matchesKey(data, Key.return)) {
+		// submit. matchesKey(Key.enter) covers the common encodings (\r, kitty
+		// CSI-u \x1b[13u, kpEnter), BUT it misses two real Enter encodings that
+		// leave the overlay stuck-on-Enter (dots grow, submit never fires):
+		//   - CRLF ("\r\n"): matchesKey returns FALSE for the 2-byte chunk.
+		//   - bare LF ("\n") with Kitty protocol active: the enter branch is gated
+		//     on !isKittyProtocolActive(), so LF is rejected. Hits terminals/tmux
+		//     that disambiguate printables as CSI-u (dots still grow) yet send a
+		//     legacy LF byte for Enter.
+		// Accept any chunk that is purely CR/LF as submit. Paste-safe: pi wraps
+		// pastes in bracketed-paste markers, so a paste chunk never equals pure
+		// CR/LF (verified against \x1b[200~…\x1b[201~ in the masked-overlay smoke).
+		const isEnter = matchesKey(data, Key.enter) || matchesKey(data, Key.return) || /^[\r\n]+$/.test(data);
+		if (isEnter) {
 			this.finish(this.buffer);
 			return;
 		}
