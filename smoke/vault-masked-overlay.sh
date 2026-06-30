@@ -85,6 +85,16 @@ grep -qE 'this\.dotRow\(' "$EXT" || { fail "overlay render() does not delegate t
 	|| { fail "regression: deep import @earendil-works/pi-tui/dist/keys.js (pi loader can't resolve this subpath)"; exit 1; }
 grep -q 'function decodePrintableKey' "$EXT" \
 	|| { fail "regression: inline decodePrintableKey() missing (overlay can't decode typed input)"; exit 1; }
+# REGRESSION GUARD (2026-06-30 uncaughtException hardening): pi-core's
+# TUI.handleInput (pi-tui dist/tui.js) dispatches to the focused component
+# with NO try/catch — any throw in the overlay's input handler becomes an
+# uncaughtException that kills pi mid-secret-entry. The public handleInput
+# must be TOTAL: it extracts its body into a private handleInputUnsafe and
+# wraps the call in try/catch (drop the offending keystroke, keep pi alive).
+grep -q 'private handleInputUnsafe(data: string): void {' "$EXT" \
+	|| { fail "regression: handleInput body not extracted to handleInputUnsafe (uncaughtException guard removed)"; exit 1; }
+grep -q 'this.handleInputUnsafe(data);' "$EXT" \
+	|| { fail "regression: handleInput does not delegate to handleInputUnsafe (no total-handler wrapper)"; exit 1; }
 ok "captureSecret + MaskedInputOverlay wired for add + rotate"
 
 # ── 3. LOAD: extension compiles + loads under pi's real loader ────────
