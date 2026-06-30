@@ -15,6 +15,8 @@
 #      /vault add and /vault rotate, and no inline ctx.ui.input secret capture
 #      remains in those handlers (the old v1 path was replaced, not duplicated).
 #   3. LOAD: the extension still compiles + loads under pi's real loader.
+#   4. UNIT: submit fires for every Enter byte encoding (the stuck-on-Enter
+#      root cause) — see the 2026-06-30 stuck-on-Enter fix below.
 
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -95,6 +97,16 @@ grep -q 'private handleInputUnsafe(data: string): void {' "$EXT" \
 	|| { fail "regression: handleInput body not extracted to handleInputUnsafe (uncaughtException guard removed)"; exit 1; }
 grep -q 'this.handleInputUnsafe(data);' "$EXT" \
 	|| { fail "regression: handleInput does not delegate to handleInputUnsafe (no total-handler wrapper)"; exit 1; }
+# REGRESSION GUARD (2026-06-30 stuck-on-Enter): matchesKey(Key.enter) misses
+# two real Enter encodings — CRLF ("\r\n") always, and bare LF ("\n") when
+# Kitty protocol is active (the enter branch is gated on !isKittyProtocolActive).
+# Both leave the overlay stuck: dots grow on every printable, but Enter never
+# fires finish(). The overlay MUST also accept any pure CR/LF chunk as submit
+# (paste-safe: bracketed-paste chunks are never pure CR/LF). The guard checks
+# the source still carries that raw-CR/LF fallback via a fixed-string search
+# for the literal bytes of the character class.
+grep -qF 'isEnter' "$EXT" \
+	|| { fail "regression: submit predicate isEnter missing (raw-CR/LF Enter fallback removed -> stuck-on-Enter returns)"; exit 1; }
 ok "captureSecret + MaskedInputOverlay wired for add + rotate"
 
 # ── 3. LOAD: extension compiles + loads under pi's real loader ────────
@@ -106,6 +118,41 @@ if [[ $rc -ne 0 ]] || grep -qiE "ParseError|Failed to load extension|TypeError|R
 fi
 ok "extension loads cleanly under pi (no ParseError / load failure)"
 rm -f /tmp/cv-mo-load.out /tmp/cv-mo-load.err
+
+# ── 4. UNIT: Enter byte-encoding coverage (the stuck-on-Enter root cause) ─
+header "F1 unit: submit fires for every Enter encoding (CR/LF/CRLF, kitty on/off)"
+ENTER_JS="$UNIT_DIR/_enter_check.js"
+cat > "$ENTER_JS" <<'JS'
+// Drive pi-tui's real matchesKey through the SAME predicate the overlay uses,
+// in both kitty states, for every Enter byte variant — plus paste/printable
+// rejection. Mirrors MaskedInputOverlay.handleInputUnsafe's isEnter exactly.
+const { matchesKey, setKittyProtocolActive } = require(process.argv[2]);
+const isEnter = (d) => matchesKey(d, "enter") || matchesKey(d, "return") || /^[\r\n]+$/.test(d);
+const assert = (c, m) => { if (!c) { console.error("  " + m); process.exit(1); } };
+const enterCases = [["CR \\r", "\r"], ["LF \\n", "\n"], ["CRLF \\r\\n", "\r\n"]];
+let checked = 0;
+for (const kitty of [false, true]) {
+	setKittyProtocolActive(kitty);
+	for (const [n, d] of enterCases) {
+		assert(isEnter(d), `kitty=${kitty} Enter ${n}: NOT recognised as submit -> overlay would stick`);
+		checked++;
+	}
+}
+// paste safety: bracketed paste + printables + escape sequences must NOT submit
+for (const d of ["a", "x", "\x1b[A", "\x1b[200~abc\r\n\x1b[201~"]) {
+	assert(!isEnter(d), `non-Enter ${JSON.stringify(d)} wrongly treated as submit`);
+	checked++;
+}
+console.error(`  OK ${checked} cases; every Enter byte submits in both kitty states; pastes/printables rejected`);
+JS
+# Resolve pi-tui's barrel through the installed pi-coding-agent (portable across
+# the common global install roots on macOS + Linux). The LOAD section above
+# already requires `pi` on PATH, so the install is guaranteed present.
+PI_TUI="$(node -e 'let r="";const p=["/opt/homebrew/lib/node_modules/@earendil-works/pi-coding-agent","/usr/local/lib/node_modules/@earendil-works/pi-coding-agent",(process.env.HOME||"")+"/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent"];for(const b of p){try{r=require.resolve("@earendil-works/pi-tui",{paths:[b]});break}catch{}}console.log(r)' 2>/dev/null)"
+[[ -n "$PI_TUI" && -f "$PI_TUI" ]] || { fail "could not locate @earendil-works/pi-tui barrel to verify Enter byte coverage"; exit 1; }
+node "$ENTER_JS" "$PI_TUI" >&2 \
+	|| { fail "Enter byte coverage broken — some Enter encoding won't submit (stuck overlay)"; exit 1; }
+ok "submit covers CR/LF/CRLF in both kitty states; pastes rejected"
 
 echo
 ok "vault-masked-overlay: F1 render invariant holds + overlay wired + loads"
