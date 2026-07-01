@@ -37,9 +37,35 @@ function lockPath() {
 	return `${vaultPath()}.lock`;
 }
 
+// ── passphrase guard (load-bearing security invariant) ───────────────
+// The vault's entire value proposition is "secrets are encrypted at rest."
+// That collapses to nothing if the passphrase is empty: openssl -aes-256-cbc
+// happily encrypts with a zero-length key, producing a file that LOOKS like
+// ciphertext but decrypts trivially with an empty passphrase — i.e. plaintext.
+// Worse, every addEntry/writeVault call would still report SUCCESS, giving the
+// user a false sense of security while storing the key in the clear.
+//
+// SECURITY.md R2 historically CLAIMED "cv-tui enforces a minimum passphrase
+// length" — but that enforcement did not exist anywhere (the docs lied), and a
+// red/blue repro confirmed an empty passphrase produced a decryptable-as-empty
+// vault with `{created:true}` reported. This guard is the real enforcement:
+// the crypto layer REFUSES a non-string / empty / whitespace-only passphrase,
+// so NO caller (CLI, TUI, onboarding, future code) can silently create a
+// plaintext vault. Pinned shut by smoke/vault-failclosed.sh (B2).
+function assertPassphrase(passphrase) {
+	if (typeof passphrase !== "string" || passphrase.trim() === "") {
+		throw new Error(
+			"vault: passphrase must be a non-empty string — an empty passphrase would " +
+			"store secrets as plaintext (the vault would decrypt with no key).",
+		);
+	}
+	return passphrase;
+}
+
 // ── crypto: thin openssl wrappers (D2 cipher) ──────────────────────────
 // Both take/return the passphrase on stdin so it never hits argv.
 function encrypt(plaintext, passphrase) {
+	assertPassphrase(passphrase);
 	return execFileSync(
 		"openssl",
 		["enc", "-aes-256-cbc", "-pbkdf2", "-iter", "600000", "-salt", "-pass", "stdin"],
@@ -47,6 +73,7 @@ function encrypt(plaintext, passphrase) {
 	);
 }
 function decrypt(ciphertext, passphrase) {
+	assertPassphrase(passphrase);
 	return execFileSync(
 		"openssl",
 		["enc", "-d", "-aes-256-cbc", "-pbkdf2", "-iter", "600000", "-pass", "stdin"],
@@ -498,6 +525,60 @@ function exportToCommand(passphrase, id, opts = {}) {
 	});
 }
 
+// ── keychain (vault-wire P0): best-effort master-passphrase store ─────
+// The macOS keychain holds the vault's master passphrase under service
+// "apple-pi-vault" (account = the user). These three helpers are
+// BEST-EFFORT: a locked keychain, a missing item, or a non-darwin host
+// → read returns null / write+delete return false, NEVER throw. Callers
+// (extension getPassphrase tier 2, CLI getPassphrase tier 2, /vault unlock)
+// treat null/false as "fall through to the next resolution tier".
+//
+// WHY the keychain and not a file: pi runs headless (cron, launchd, SSH) where
+// a GUI prompt can't be answered — but on the mini, auto-login at boot
+// unlocks the login keychain with the GUI session, so `security
+// find-generic-password` resolves headlessly. Verified per-device by
+// smoke/vault-keychain.sh (REQ-VW-3). On a non-darwin host the tier is a no-op
+// and resolution falls through to CREDENTIALS_VAULT_PASS / tty prompt.
+//
+// RESIDUAL (R-VW-7, .docs/features/vault-wire/SECURITY.md): `add-generic-password
+// -w <pass>` puts the passphrase in the `security` process's argv for the
+// ~100ms it runs — visible to same-user `ps`. macOS `security` offers no
+// stdin/tty-free alternative without a native pty dep (violates the zero-dep
+// stance). The READ path leaks nothing (`find-generic-password -w` prints to
+// our captured stdout, never argv). The write window is one-time per device
+// and bounded to the same-user trust boundary (A3) the vault already accepts.
+const KEYCHAIN_SERVICE = "apple-pi-vault";
+function keychainRead(service) {
+	if (process.platform !== "darwin") return null;
+	try {
+		const r = execFileSync("security",
+			["find-generic-password", "-s", service || KEYCHAIN_SERVICE, "-a", os.userInfo().username, "-w"],
+			{ encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+		const v = (r || "").replace(/\r?\n$/, "");
+		return v || null;
+	} catch { return null; } // locked / not-found / non-darwin → fall through
+}
+function keychainWrite(service, passphrase) {
+	if (process.platform !== "darwin") return false;
+	try {
+		// -U updates if the item already exists (idempotent re-unlock). See the
+		// header re: the brief argv exposure — there is no zero-dep alternative.
+		execFileSync("security",
+			["add-generic-password", "-s", service || KEYCHAIN_SERVICE, "-a", os.userInfo().username, "-w", passphrase, "-U"],
+			{ encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+		return true;
+	} catch { return false; }
+}
+function keychainDelete(service) {
+	if (process.platform !== "darwin") return false;
+	try {
+		execFileSync("security",
+			["delete-generic-password", "-s", service || KEYCHAIN_SERVICE, "-a", os.userInfo().username],
+			{ encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+		return true;
+	} catch { return false; } // already gone → no-op success-ish
+}
+
 module.exports = {
 	VAULT_VERSION,
 	TRANSIENT_MAX_AGE_MS,
@@ -506,6 +587,7 @@ module.exports = {
 	addEntry, rotateEntry, listEntries, getEntry, removeEntry, pruneTransient,
 	importEntries, parseImportFile, shredFile, exportToAuth, exportToCommand,
 	looksLikeSecret, maskedDotRow,
+	keychainRead, keychainWrite, keychainDelete, KEYCHAIN_SERVICE,
 	// exported for testing only (NOT for echoing secrets):
 	_findEntryForTest: findEntry,
 };
