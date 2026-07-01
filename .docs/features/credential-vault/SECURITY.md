@@ -45,9 +45,15 @@
   session's input, which is transcribed. Mitigation is guidance, not enforcement.
   → ACCEPTED residual. The persona rule is the best we can do.
 - **R2: "What if the passphrase is weak?"** pbkdf2-600k raises the cost, but a
-  4-char passphrase falls to a GPU in minutes. → MITIGATE: cv-tui enforces a
-  minimum passphrase length on first vault creation; warn (don't block) on
-  known-weak patterns. Document the FileVault recommendation.
+  4-char passphrase falls to a GPU in minutes. → MITIGATE: the crypto core
+  (`vault/lib/vault.js#assertPassphrase`) refuses a non-string / empty /
+  whitespace-only passphrase at the `encrypt()`/`decrypt()` chokepoints, so NO
+  caller can ever create a vault that decrypts with an empty key (an empty
+  passphrase = plaintext-on-disk; openssl would otherwise happily encrypt with
+  a zero-length key and report success — see the 2026-07-01 addendum / B2).
+  Residual: a *weak-but-nonempty* passphrase (e.g. 4 chars) is still accepted;
+  the guard closes the plaintext hole, not the brute-force hole. Document the
+  FileVault recommendation (A4) as the real at-rest wall.
 - **R3: "What if `/vault get` output is captured by a screen recorder or tmux
   scrollback that got saved?"** → MITIGATE: reveal is gated (REQ-CV-5); persona
   steers users to `/vault export` → `auth.json` instead, which never displays.
@@ -164,3 +170,33 @@ adversarial review, both fixed + tripwired:
 Both are pinned by `smoke/vault-failclosed.sh` (added to `run.sh`), so a
 future refactor that reverts either fix trips the gate. Re-read conclusion:
 R1–R8 unchanged and still satisfied; the two new findings are closed.
+
+---
+
+## Red/blue pass — 2026-07-01 (empty-passphrase = plaintext-on-disk)
+
+**Threat model:** an empty/missing master passphrase collapses the vault's
+entire value proposition — `openssl enc -aes-256-cbc` happily encrypts with a
+zero-length key, so the resulting file *looks* like ciphertext but decrypts
+trivially with an empty passphrase (i.e. **plaintext**), while every
+`addEntry`/`writeVault` call reported `{created:true}` success. The user saw
+exactly this: `vault: no passphrase entered` immediately followed by
+`vault: added entry "testkey" (persistent)` — a misleading success for a
+secret stored in the clear. SECURITY.md R2 *claimed* a UI-level minimum-length
+check existed; it did not. One hole found by user report + repro, fixed +
+tripwired:
+
+- **B2 (BLOCKER, fixed) — empty/whitespace/null passphrase silently produces a
+  plaintext vault with success reported.** Repro: `core.addEntry("", {id,secret})`
+  returned `{created:true}` and `core.readVault("")` returned the secret in the
+  clear. **Fix:** added `assertPassphrase()` in `vault/lib/vault.js`, called by
+  `encrypt()` and `decrypt()` (the crypto chokepoints every read/write path
+  funnels through). Any non-string / empty / whitespace-only passphrase now
+  throws *before* openssl runs, for every caller (CLI, TUI, onboarding, future
+  code) — the guard cannot be bypassed by forgetting to validate at a higher
+  layer. A real passphrase still round-trips (the guard is not over-broad).
+
+Pinned by `smoke/vault-failclosed.sh` (B2). Re-read conclusion: the empty-pass
+plaintext hole is closed at the lowest layer; R1–R8 + the 2026-06-28 findings
+unchanged. Residual: weak-but-nonempty passphrases remain (R2 residual) —
+FileVault (A4) is the real at-rest wall, as before.

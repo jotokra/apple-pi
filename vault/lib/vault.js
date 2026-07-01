@@ -37,9 +37,35 @@ function lockPath() {
 	return `${vaultPath()}.lock`;
 }
 
+// ── passphrase guard (load-bearing security invariant) ───────────────
+// The vault's entire value proposition is "secrets are encrypted at rest."
+// That collapses to nothing if the passphrase is empty: openssl -aes-256-cbc
+// happily encrypts with a zero-length key, producing a file that LOOKS like
+// ciphertext but decrypts trivially with an empty passphrase — i.e. plaintext.
+// Worse, every addEntry/writeVault call would still report SUCCESS, giving the
+// user a false sense of security while storing the key in the clear.
+//
+// SECURITY.md R2 historically CLAIMED "cv-tui enforces a minimum passphrase
+// length" — but that enforcement did not exist anywhere (the docs lied), and a
+// red/blue repro confirmed an empty passphrase produced a decryptable-as-empty
+// vault with `{created:true}` reported. This guard is the real enforcement:
+// the crypto layer REFUSES a non-string / empty / whitespace-only passphrase,
+// so NO caller (CLI, TUI, onboarding, future code) can silently create a
+// plaintext vault. Pinned shut by smoke/vault-failclosed.sh (B2).
+function assertPassphrase(passphrase) {
+	if (typeof passphrase !== "string" || passphrase.trim() === "") {
+		throw new Error(
+			"vault: passphrase must be a non-empty string — an empty passphrase would " +
+			"store secrets as plaintext (the vault would decrypt with no key).",
+		);
+	}
+	return passphrase;
+}
+
 // ── crypto: thin openssl wrappers (D2 cipher) ──────────────────────────
 // Both take/return the passphrase on stdin so it never hits argv.
 function encrypt(plaintext, passphrase) {
+	assertPassphrase(passphrase);
 	return execFileSync(
 		"openssl",
 		["enc", "-aes-256-cbc", "-pbkdf2", "-iter", "600000", "-salt", "-pass", "stdin"],
@@ -47,6 +73,7 @@ function encrypt(plaintext, passphrase) {
 	);
 }
 function decrypt(ciphertext, passphrase) {
+	assertPassphrase(passphrase);
 	return execFileSync(
 		"openssl",
 		["enc", "-d", "-aes-256-cbc", "-pbkdf2", "-iter", "600000", "-pass", "stdin"],
