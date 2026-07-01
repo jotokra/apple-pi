@@ -1,5 +1,5 @@
 #!/bin/bash
-# smoke/vault-failclosed.sh — red-blue regression: the two data-loss holes.
+# smoke/vault-failclosed.sh — red-blue regression: the data-loss / integrity holes.
 #
 # These were found in a red/blue pass and FIXED. This smoke pins them shut so
 # a future refactor can't silently bring them back:
@@ -15,7 +15,17 @@
 #        (Defence: O_EXCL temp creation — openSync("wx") — fails if the path
 #        exists, including a symlink.)
 #
-# Both must FAIL CLOSED: error out, touch nothing.
+#   B2 — the crypto core must REFUSE an empty / whitespace-only passphrase.
+#        (Integrity vector: openssl -aes-256-cbc happily encrypts with a
+#        zero-length key, so an empty passphrase produced a vault that LOOKED
+#        like ciphertext but decrypted trivially with an empty passphrase —
+#        i.e. plaintext — while every addEntry reported {created:true}. The
+#        "encrypted at rest" promise collapsed to nothing. SECURITY.md R2
+#        claimed a UI-level minimum-length check existed; it didn't. The real
+#        enforcement is now in the crypto chokepoint: assertPassphrase() in
+#        vault/lib/vault.js, called by encrypt()/decrypt().)
+#
+# All three must FAIL CLOSED: error out, touch nothing.
 
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -72,5 +82,47 @@ case $rc in
 	3) fail "W1: writeVault refused but victim was still modified"; exit 1 ;;
 	*) fail "W1: unexpected rc=$rc"; exit 1 ;;
 esac
+
+# B2 — empty / whitespace / null / undefined passphrase must be refused by the
+# crypto core. No caller (CLI, TUI, onboarding) may ever create a vault that
+# decrypts with an empty passphrase. The guard lives in encrypt()/decrypt();
+# every read/write path funnels through them, so this one assertion covers the
+# whole surface.
+header "B2 — empty/whitespace/null passphrase: core refuses, no plaintext write"
+SBX3="$(mktemp -d /tmp/cv-pp.XXXXXX)"
+node -e "
+	const v = require('./vault/lib/vault');
+	process.env.PI_CODING_AGENT_DIR = '$SBX3';
+	const cases = ['', '   ', '\t \n', null, undefined];
+	let leak = 0;
+	for (const bad of cases) {
+		// ensureVault + addEntry must both throw; a return = silent plaintext write.
+		let threw = false;
+		try { v.ensureVault(bad); } catch { threw = true; }
+		if (!threw) { console.error('  ensureVault accepted ' + JSON.stringify(bad)); leak++; }
+		threw = false;
+		try { v.addEntry(bad, { id: 'x', secret: 'plaintext-leak' }); } catch { threw = true; }
+		if (!threw) { console.error('  addEntry accepted ' + JSON.stringify(bad)); leak++; }
+	}
+	// belt-and-suspenders: confirm a real passphrase still works (guard isn't over-broad)
+	v.ensureVault('a-real-passphrase');
+	v.addEntry('a-real-passphrase', { id: 'openai', secret: 'sk-real' });
+	const env = v.readVault('a-real-passphrase');
+	if (!env || env.entries[0].secret !== 'sk-real') { console.error('  real passphrase round-trip broke'); leak++; }
+	process.exit(leak === 0 ? 0 : 2);
+" || { fail "B2: crypto core accepted an empty/invalid passphrase (plaintext-on-disk hole open)"; exit 1; }
+# also assert NO vault file was created by the rejected calls
+if [[ -f "$SBX3/agent/credentials.vault" ]]; then
+	# a vault may legitimately exist from the real-pass round-trip; verify it does
+	# NOT decrypt with an empty passphrase (i.e. it is genuinely encrypted).
+	node -e "
+		const v = require('./vault/lib/vault');
+		process.env.PI_CODING_AGENT_DIR = '$SBX3';
+		let emptyOpened = false;
+		try { if (v.readVault('') !== null) emptyOpened = true; } catch { /* good: refused */ }
+		if (emptyOpened) process.exit(2);
+	" || { fail "B2: the vault file decrypts with an empty passphrase = plaintext"; exit 1; }
+fi
+ok "B2: empty/whitespace/null passphrase refused; real passphrase still works"
 
 ok "vault-failclosed"
