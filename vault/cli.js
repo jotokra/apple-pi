@@ -20,7 +20,8 @@ const os = require("node:os");
 const {
 	ensureVault, addEntry, rotateEntry, listEntries, getEntry, removeEntry,
 	pruneTransient, importEntries, parseImportFile, shredFile, exportToAuth,
-	exportToCommand, vaultPath,
+	exportToCommand, readVault, vaultPath,
+	keychainRead, keychainWrite, keychainDelete,
 } = require("./lib/vault");
 
 // Read vault.exportCmd from pi's settings.json (the documented home for vault.*
@@ -67,9 +68,13 @@ function readSecretFromStdin() {
 }
 
 function getPassphrase() {
+	// REQ-VW-1 three-tier resolution (mirrors the extension's getPassphrase):
+	// tier 1 env → tier 2 keychain → tier 3 tty prompt.
 	if (process.env.CREDENTIALS_VAULT_PASS) return process.env.CREDENTIALS_VAULT_PASS;
+	const kc = keychainRead();
+	if (kc) return kc;
 	if (!process.stdin.isTTY) {
-		process.stderr.write("vault: passphrase required — set CREDENTIALS_VAULT_PASS or run on a tty.\n");
+		process.stderr.write("vault: passphrase required — set CREDENTIALS_VAULT_PASS, run 'vault unlock', or run on a tty.\n");
 		process.exit(2);
 	}
 	const { spawnSync } = require("node:child_process");
@@ -104,9 +109,13 @@ function usage() {
   vault import <file>              bulk-load entries from JSON, then shred source
   vault export <id> [--provider P] write the secret into auth.json (api_key shape)
   vault export-to <id>      run vault.exportCmd with the secret on STDIN (F2)
+  vault unlock              store the master passphrase in the keychain (headless)
+      one-time per device; future runs resolve without CREDENTIALS_VAULT_PASS.
+      bootstrap: CREDENTIALS_VAULT_PASS=<pass> apple-pi vault unlock
+  vault lock --keychain     remove the stored keychain passphrase entry
 
-Passphrase: set CREDENTIALS_VAULT_PASS for non-interactive use, or it is
-prompted on the tty. Vault: ${vaultPath()}
+Passphrase: set CREDENTIALS_VAULT_PASS, run 'vault unlock' once (stored in the
+macOS keychain on darwin), or it is prompted on the tty. Vault: ${vaultPath()}
 `);
 }
 
@@ -131,9 +140,16 @@ function run(argv) {
 	const [sub, ...rest] = argv;
 	if (!sub || sub === "-h" || sub === "--help" || sub === "help") { usage(); return 0; }
 
-	const pass = getPassphrase();
-	try { ensureVault(pass); }
-	catch (e) { process.stderr.write(`vault: could not open vault: ${e.message}\n`); return 1; }
+	// lock + unlock manage the passphrase themselves (lock --keychain deletes by
+	// service/account with no passphrase; unlock captures + stores). All other
+	// subcommands need an open vault up front.
+	const NO_GATE = new Set(["lock", "unlock"]);
+	let pass = "";
+	if (!NO_GATE.has(sub)) {
+		pass = getPassphrase();
+		try { ensureVault(pass); }
+		catch (e) { process.stderr.write(`vault: could not open vault: ${e.message}\n`); return 1; }
+	}
 
 	switch (sub) {
 		case "add": {
@@ -246,6 +262,31 @@ function run(argv) {
 				process.stdout.write(`exported '${id}' via vault.exportCmd\n`);
 				return 0;
 			});
+		}
+		case "unlock": {
+			// REQ-VW-2 (headless): capture the passphrase (env → keychain → tty) and
+			// store it in the keychain so future runs resolve headlessly. Verify it
+			// opens the vault (or bootstrap an empty one) before storing.
+			const p = getPassphrase();
+			try {
+				const env = readVault(p);
+				if (env === null) ensureVault(p);
+			} catch { process.stderr.write("vault unlock: incorrect passphrase — not stored\n"); return 1; }
+			const ok = keychainWrite(null, p);
+			if (!ok) { process.stderr.write("vault unlock: could not write to keychain (macOS only, or locked)\n"); return 1; }
+			process.stdout.write("vault: passphrase stored in keychain — future runs resolve headlessly\n");
+			return 0;
+		}
+		case "lock": {
+			// REQ-VW-2: --keychain removes the stored passphrase entry. Bare `lock` is
+			// informational (the CLI holds no per-process passphrase cache).
+			if (rest.includes("--keychain")) {
+				const ok = keychainDelete(null);
+				process.stdout.write(`${ok ? "vault: keychain entry removed" : "vault: no keychain entry to remove"}\n`);
+				return 0;
+			}
+			process.stdout.write("vault: use 'vault lock --keychain' to remove the stored keychain entry\n");
+			return 0;
 		}
 		default:
 			process.stderr.write(`vault: unknown subcommand '${sub}'\n`);

@@ -40,10 +40,16 @@
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-// pi-tui key utilities — verified exports of @earendil-works/pi-tui (see the
-// installed package's dist/keys.d.ts). Used by the masked-entry overlay (F1)
-// to parse raw terminal keystrokes without hand-rolling escape sequences.
-import { Key, matchesKey, decodePrintableKey, type TUI, type Theme, type Component } from "@earendil-works/pi-tui";
+// pi-tui key utilities re-exported from the package barrel. (matchesKey + Key
+// ARE in the barrel; decodePrintableKey is NOT — only the narrower
+// decodeKittyPrintable is, and the full version lives in dist/keys.js, which
+// pi's extension loader cannot resolve as a package subpath. The overlay
+// uses a self-contained inline decoder instead — see decodePrintableKey()
+// below — so this component never depends on a non-barrel export.)
+import { Key, matchesKey, type TUI, type Theme, type Component } from "@earendil-works/pi-tui";
+// vault-wire P1: the in-memory registry + read-only projection. The session_start
+// auto-wire and /vault wire both drive this; bridges import secret() directly.
+import { projectWire, clearCache } from "./_lib/vault-registry";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -84,12 +90,23 @@ function noCoreError(ctx: ExtensionCommandContext): void {
 
 // ── passphrase cache (per-process; `/vault lock` flushes) ─────────────
 let cachedPass: string | null = null;
-async function getPassphrase(ctx: ExtensionCommandContext): Promise<string | null> {
+// REQ-VW-1: three-tier passphrase resolution. First non-empty wins:
+//   tier 1 — CREDENTIALS_VAULT_PASS env (headless / wrapper-set; explicit operator intent)
+//   tier 2 — macOS keychain service "apple-pi-vault" (P3 unlock; best-effort,
+//            locked/missing/non-macOS falls through — never throws)
+//   tier 3 — tty prompt (interactive pi only)
+// `core` is the vault core (provides keychainRead); it is already loaded by
+// the handler before this is called. Cached on first success for the process.
+async function getPassphrase(ctx: ExtensionCommandContext, core: any): Promise<string | null> {
 	if (cachedPass) return cachedPass;
-	// Preferred: env var (headless / set by a wrapper). Then tty-style prompt.
+	// tier 1: env (highest priority — explicit operator intent).
 	const env = process.env.CREDENTIALS_VAULT_PASS;
 	if (env) { cachedPass = env; return env; }
-	if (!ctx.hasUI) { ctx.ui.notify("vault: passphrase required (set CREDENTIALS_VAULT_PASS or run in the TUI)", "error"); return null; }
+	// tier 2: keychain (P3). Best-effort: locked/missing/non-macOS → null → fall through.
+	const kc = core.keychainRead();
+	if (kc) { cachedPass = kc; return kc; }
+	// tier 3: tty prompt (interactive pi only).
+	if (!ctx.hasUI) { ctx.ui.notify("vault: passphrase required (set CREDENTIALS_VAULT_PASS, run /vault unlock, or run in the TUI)", "error"); return null; }
 	const pass = await ctx.ui.input("Vault passphrase");
 	if (!pass) { ctx.ui.notify("vault: no passphrase entered", "warning"); return null; }
 	cachedPass = pass;
@@ -122,6 +139,47 @@ function parseArgs(args: string): { positional: string[]; flags: Record<string, 
 // Falls back to ctx.ui.input (the v1 path) when overlay capture is
 // unavailable (non-TUI mode, or custom() throws). REQ-CV-7's tracefree smoke
 // re-asserts trace-freeness regardless of which path runs.
+
+/**
+ * Decode a terminal keystroke chunk into a printable char, or undefined.
+ * Self-contained (NOT imported) because pi-tui's barrel re-exports only the
+ * narrower decodeKittyPrintable; the full decodePrintableKey lives in
+ * dist/keys.js, which (a) the barrel doesn't re-export and (b) pi's extension
+ * loader can't resolve as a subpath. Importing the barrel name silently binds
+ * to undefined and the overlay then crashes on the first keystroke with
+ * "decodePrintableKey is not a function".
+ *
+ * Handles both keyboard modes a pi TUI can run in: legacy raw bytes (what pi
+ * uses today — it never calls setKittyProtocolActive) AND Kitty CSI-u /
+ * xterm modifyOtherKeys disambiguation (future-proofing). Accepts only plain or
+ * Shift-modified keys; rejects Ctrl/Alt/Super (those are keybindings, not
+ * text). Mirrors pi-tui's decodePrintableKey = decodeKittyPrintable(data) ??
+ * decodeModifyOtherKeysPrintable(data) for the printable-only subset.
+ */
+function decodePrintableKey(data: string): string | undefined {
+	const fromCp = (cp: number): string | undefined => {
+		if (!Number.isFinite(cp) || cp < 32) return undefined;
+		try { return String.fromCodePoint(cp); } catch { return undefined; }
+	};
+	// Kitty CSI-u: ESC[<cp>[:<shifted>[:<base>]];<mod>[:<event>]u
+	const kitty = data.match(/^\x1b\[(\d+)(?::(\d*))?(?::(\d+))?(?:;(\d+))?(?::(\d+))?u$/);
+	if (kitty) {
+		const cp = Number.parseInt(kitty[1] ?? "", 10);
+		const shifted = kitty[2] && kitty[2].length > 0 ? Number.parseInt(kitty[2], 10) : undefined;
+		const mod = kitty[4] ? Number.parseInt(kitty[4], 10) - 1 : 0; // CSI-u mods are 1-indexed
+		if (mod !== 0 && mod !== 1) return undefined; // accept only none / shift (bit0)
+		return fromCp(mod === 1 && typeof shifted === "number" ? shifted : cp);
+	}
+	// xterm modifyOtherKeys: ESC[27;<mod>;<cp>~
+	const mok = data.match(/^\x1b\[27;(\d+);(\d+)~$/);
+	if (mok) {
+		const mod = Number.parseInt(mok[1], 10) - 1;
+		if (mod !== 0 && mod !== 1) return undefined;
+		return fromCp(Number.parseInt(mok[2], 10));
+	}
+	return undefined;
+}
+
 class MaskedInputOverlay implements Component {
 	private buffer = "";
 	private tui: TUI;
@@ -151,8 +209,34 @@ class MaskedInputOverlay implements Component {
 	// REQUIRED (no-op; the overlay has no cached render state beyond `buffer`).
 	invalidate(): void { /* stateless beyond this.buffer */ }
 	handleInput(data: string): void {
-		// submit
-		if (matchesKey(data, Key.enter) || matchesKey(data, Key.return)) {
+		// Defense-in-depth: pi-core's TUI.handleInput (pi-tui dist/tui.js)
+		// dispatches to the focused component with NO try/catch — any throw
+		// here becomes an uncaughtException that kills pi mid-secret-entry
+		// (the historic crash was decodePrintableKey resolving to an undefined
+		// pi-tui barrel export; that symbol bug is fixed, but this guard makes
+		// the handler TOTAL against ANY future throw). On error: drop the
+		// offending keystroke, keep the overlay + pi alive, re-render. Never
+		// call finish() from the catch — a degraded keystroke-drop beats a crash.
+		try {
+			this.handleInputUnsafe(data);
+		} catch {
+			this.tui.requestRender();
+		}
+	}
+	private handleInputUnsafe(data: string): void {
+		// submit. matchesKey(Key.enter) covers the common encodings (\r, kitty
+		// CSI-u \x1b[13u, kpEnter), BUT it misses two real Enter encodings that
+		// leave the overlay stuck-on-Enter (dots grow, submit never fires):
+		//   - CRLF ("\r\n"): matchesKey returns FALSE for the 2-byte chunk.
+		//   - bare LF ("\n") with Kitty protocol active: the enter branch is gated
+		//     on !isKittyProtocolActive(), so LF is rejected. Hits terminals/tmux
+		//     that disambiguate printables as CSI-u (dots still grow) yet send a
+		//     legacy LF byte for Enter.
+		// Accept any chunk that is purely CR/LF as submit. Paste-safe: pi wraps
+		// pastes in bracketed-paste markers, so a paste chunk never equals pure
+		// CR/LF (verified against \x1b[200~…\x1b[201~ in the masked-overlay smoke).
+		const isEnter = matchesKey(data, Key.enter) || matchesKey(data, Key.return) || /^[\r\n]+$/.test(data);
+		if (isEnter) {
 			this.finish(this.buffer);
 			return;
 		}
@@ -175,14 +259,35 @@ class MaskedInputOverlay implements Component {
 			}
 			return;
 		}
-		// printable chars (handles a multi-char paste by walking each char).
-		// decodePrintableKey rejects non-printables (ctrl/alt combos, escape
-		// sequences) so they can't pollute the buffer.
-		for (const ch of data) {
-			const p = decodePrintableKey(ch);
-			if (p) this.buffer += p;
+		// printable input — two paths:
+		//  (a) Kitty CSI-u / xterm modifyOtherKeys encode even plain keys as escape
+		//      sequences (e.g. ESC[97u = 'a'); decodePrintableKey takes the WHOLE
+		//      chunk and returns the decoded char.
+		//  (b) normal terminals send raw bytes; a paste is multiple chars.
+		// decodePrintableKey only matches whole escape sequences, so feed it the
+		// full chunk — never per-char (per-char silently drops every raw byte:
+		// the regex needs the whole ESC[…u / ESC[27;m;c~ sequence). Any chunk that
+		// still contains an ESC leader is a control sequence (arrow key / F-key /
+		// Alt+x) we didn't match above; reject it rather than letting its stray
+		// glyphs ([, A, digits…) leak into the secret buffer.
+		const decoded = decodePrintableKey(data);
+		if (decoded !== undefined) {
+			this.buffer += decoded;
+			this.tui.requestRender();
+			return;
 		}
-		if (this.buffer) this.tui.requestRender();
+		if (data.includes("\x1b")) return;
+		let appended = false;
+		for (const ch of data) {
+			const code = ch.codePointAt(0)!;
+			// printable = ASCII 0x20–0x7e, or non-ASCII >= 0xa0. Reject DEL (0x7f)
+			// and C1 controls (0x80–0x9f) so ctrl combos can't inject glyphs.
+			if ((code >= 0x20 && code <= 0x7e) || code >= 0xa0) {
+				this.buffer += ch;
+				appended = true;
+			}
+		}
+		if (appended) this.tui.requestRender();
 	}
 	private finish(result: string | undefined): void {
 		// zero the buffer, then resolve. The secret lived only on this instance.
@@ -413,16 +518,75 @@ async function cmdExportTo(ctx: ExtensionCommandContext, core: any, args: string
 	}
 }
 
-function cmdLock(ctx: ExtensionCommandContext): void {
+// REQ-VW-2: `/vault unlock` — capture the master passphrase (masked) and store
+// it in the keychain so every future /vault use (and the auto-wire, P1) resolves
+// headlessly without re-typing. Verifies the passphrase actually opens the vault
+// (readVault throws on a wrong one) before storing; bootstraps an empty vault if
+// none exists yet. Re-running replaces the stored entry (keychainWrite is idempotent).
+async function cmdUnlock(ctx: ExtensionCommandContext, core: any): Promise<void> {
+	const existing = core.keychainRead();
+	const prompt = existing
+		? "Re-enter the vault passphrase (replaces the stored keychain entry; masked)"
+		: "Enter the vault passphrase to store in the keychain (masked; dots only)";
+	const pass = await captureSecret(ctx, core, prompt);
+	if (!pass) { ctx.ui.notify("vault unlock: no passphrase entered — nothing stored", "warning"); return; }
+	// verify: readVault throws on a WRONG passphrase; returns null only if no vault
+	// file exists (then bootstrap an empty one with this passphrase).
+	try {
+		const env = core.readVault(pass);
+		if (env === null) core.ensureVault(pass);
+	} catch (e: any) {
+		ctx.ui.notify(`vault unlock: incorrect passphrase — not stored`, "error");
+		return;
+	}
+	const ok = core.keychainWrite(pass);
+	if (!ok) { ctx.ui.notify("vault unlock: could not write to the keychain (macOS only, or keychain locked)", "error"); return; }
+	cachedPass = pass; // cache for this session too, so the very next /vault call is instant
+	ctx.ui.notify(`vault: passphrase stored in the keychain${existing ? " (replaced)" : ""} — /vault now resolves headlessly`, "info");
+}
+
+function cmdLock(ctx: ExtensionCommandContext, core: any, args: string): void {
+	const { flags } = parseArgs(args);
 	cachedPass = null;
-	ctx.ui.notify("vault: passphrase forgotten — re-prompt next /vault use", "info");
+	clearCache(); // also drop the vault-wire registry so secrets stop resolving
+	if (flags["keychain"] !== undefined) {
+		const ok = core.keychainDelete();
+		ctx.ui.notify(
+			ok ? "vault: passphrase forgotten + keychain entry removed (next /vault re-prompts)" : "vault: passphrase forgotten, but no keychain entry was present to remove",
+			ok ? "info" : "warning",
+		);
+		return;
+	}
+	ctx.ui.notify("vault: passphrase forgotten for this session — re-prompt next /vault use (add --keychain to also remove the stored keychain entry)", "info");
+}
+
+// REQ-VW-8: `/vault wire` — preview (--dry-run, the default) or run (--apply) the
+// vault.wire projection. Reuses the session's cached passphrase if unlocked, else
+// the registry resolves headlessly (env/keychain). Shows one line per entry
+// (id + surface; never the secret) via a dismissable list.
+async function cmdWire(ctx: ExtensionCommandContext, _core: any, args: string): Promise<void> {
+	const dryRun = !args.includes("--apply");
+	const lines: string[] = [];
+	const res = await projectWire({
+		dryRun,
+		passphrase: cachedPass || undefined, // reuse an unlocked passphrase; else registry resolves
+		log: (m) => lines.push(m),
+	});
+	if (!lines.length) lines.push("(no vault.wire entries configured — add a `vault.wire` map to settings.json)");
+	const head = dryRun ? `vault wire — DRY RUN (no writes; --apply to project)` : `vault wire — applied`;
+	const summary =
+		`${res.auth.length} auth, ${res.command.length} command, ${res.bridge.length} bridge` +
+		(res.missing.length ? `, ${res.missing.length} missing` : "") +
+		(res.errors.length ? `, ${res.errors.length} error(s)` : "");
+	ctx.ui.notify(`${head} — ${summary}`, res.errors.length ? "warning" : "info");
+	await ctx.ui.select(`${head} — ${summary}`, lines);
 }
 
 // ── registration ──────────────────────────────────────────────────────
 export default function credentialVaultExtension(pi: ExtensionAPI): void {
-	const SUBS = ["add", "list", "get", "remove", "rotate", "import", "export", "export-to", "lock", "prune-transient"];
+	const SUBS = ["add", "list", "get", "remove", "rotate", "import", "export", "export-to", "lock", "unlock", "wire", "prune-transient"];
 	pi.registerCommand("vault", {
-		description: "Encrypted credential vault (add/list/get/remove/rotate/import/export/lock)",
+		description: "Encrypted credential vault (add/list/get/remove/rotate/import/export/lock/unlock/wire)",
 		getArgumentCompletions: (prefix) => {
 			const hits = SUBS.filter((s) => s.startsWith(prefix));
 			return hits.length ? hits.map((s) => ({ value: s, label: s })) : null;
@@ -437,9 +601,10 @@ export default function credentialVaultExtension(pi: ExtensionAPI): void {
 			const sub = (sp >= 0 ? trimmed.slice(0, sp) : trimmed) || "list";
 			const rest = sp >= 0 ? trimmed.slice(sp + 1) : "";
 
-			// lock + list need no passphrase upfront (lock clears it; list will prompt)
-			if (sub !== "lock") {
-				const pass = await getPassphrase(ctx);
+			// lock + unlock + wire manage the passphrase themselves and skip the upfront gate;
+			// list will prompt via getPassphrase below.
+			if (sub !== "lock" && sub !== "unlock" && sub !== "wire") {
+				const pass = await getPassphrase(ctx, core);
 				if (!pass) return;
 				try { core.ensureVault(pass); }
 				catch (e: any) { ctx.ui.notify(`vault: could not open vault: ${e?.message || String(e)}`, "error"); return; }
@@ -455,10 +620,24 @@ export default function credentialVaultExtension(pi: ExtensionAPI): void {
 				case "export":           return cmdExport(ctx, core, rest);
 				case "export-to":        return cmdExportTo(ctx, core, rest);
 				case "prune-transient":  return cmdPruneTransient(ctx, core);
-				case "lock":             return cmdLock(ctx); return;
+				case "lock":             return cmdLock(ctx, core, rest);
+				case "unlock":           return cmdUnlock(ctx, core);
+				case "wire":             return cmdWire(ctx, core, rest);
 				default:
-					ctx.ui.notify(`vault: unknown subcommand "${sub}" — try add/list/get/remove/rotate/import/export/lock`, "warning");
+					ctx.ui.notify(`vault: unknown subcommand "${sub}" — try add/list/get/remove/rotate/import/export/lock/unlock/wire`, "warning");
 			}
 		},
+	});
+
+	// REQ-VW-5: the auto-wire. On session start (and reload), decrypt the vault
+	// once and project vault.wire → auth.json / bridges / commands. Fire-and-forget
+	// (NOT awaited) so a slow/hung external command can't delay startup; exportToCommand
+	// has its own 10s timeout. Read-only on the vault, never process.env (C-1/C-2).
+	// No passphrase yet (no keychain/env) → projectWire degrades to a no-op (R-VW-4).
+	pi.on("session_start", (event, ctx) => {
+		if (event.reason !== "startup" && event.reason !== "reload") return;
+		projectWire({ log: () => {} }).catch((e) => {
+			try { ctx.ui.notify(`vault wire: ${e?.message || String(e)}`, "warning"); } catch { /* non-TUI ctx */ }
+		});
 	});
 }
