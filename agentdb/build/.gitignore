@@ -1,4 +1,5 @@
 progress.json
 logs/
-.orchestrator.lock
 BUILD.md
+.lock
+*.prompt
