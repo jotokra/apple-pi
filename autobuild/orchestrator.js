@@ -65,6 +65,21 @@ fs.writeFileSync(LOCK, String(process.pid));
 const release = () => { try { fs.unlinkSync(LOCK); } catch {} };
 process.on("exit", release); process.on("SIGINT", () => { release(); process.exit(130); }); process.on("SIGTERM", () => { release(); process.exit(143); });
 
+// --- session-capture DB (initialized at the START of the process) ---
+// Captures EVERY agent + subagent session produced during the run into a durable
+// SQLite store (the seed of apple-pi's unified agent DB) for future analysis.
+// Non-fatal: a capture error is logged, never breaks the build.
+const S = require("./sessions");
+let SDB = null, RUN_ID = null;
+try {
+	SDB = S.initDb();
+	const _r = S.startRun(SDB, { cwd: WT, tasks_file: TASKS_F, orchestrator_session: process.env.HERMES_SESSION_ID || process.env.PI_SESSION_ID || null });
+	RUN_ID = _r.id;
+	console.log(`autobuild: session DB ${S.DB_PATH} (run #${RUN_ID}) — capturing all agent/subagent sessions; metadata budget ${(_r.budget / 1e9).toFixed(1)} GB (30% of ${(_r.avail / 1e9).toFixed(1)} GB avail)`);
+} catch (e) { console.error(`autobuild: session capture DISABLED (non-fatal): ${e.message}`); }
+const endRunFinally = () => { try { if (SDB && RUN_ID != null) S.endRun(SDB, RUN_ID); } catch {} };
+process.on("exit", endRunFinally); // every exit path (normal, signal, HALT) records the run end
+
 // --- tasks + progress ---
 if (!fs.existsSync(TASKS_F)) { console.error(`autobuild: tasks file not found: ${TASKS_F}`); release(); process.exit(2); }
 const TASKS = JSON.parse(fs.readFileSync(TASKS_F, "utf8")).tasks;
@@ -136,12 +151,25 @@ while (processed < MAX) {
 	fs.writeFileSync(promptF, att === 1 ? prompt(t) : prompt(t) + `\n\nPREVIOUS ATTEMPT FAILED. Verify output:\n\n${(progress[t.id].last_error || "").slice(0, 4000)}\n\nFix it so VERIFY passes.`);
 	const logf = path.join(LOGS, `${t.id}.${att}.log`);
 	fs.writeFileSync(logf, `=== ${t.id} attempt ${att} ===\n`);
+	const _sessBefore = SDB ? S.snapshotSessions() : null;
+	const _wStart = Date.now();
+	let _workerId = null;
+	if (SDB) { try { _workerId = S.recordWorker(SDB, RUN_ID, { task_id: t.id, attempt: att, worker_cmd: WORKER }); } catch (e) { fs.appendFileSync(logf, `\n[session record failed: ${e.message}]\n`); } }
 	const w = run(WORKER, { AUTOBUILD_PROMPT_FILE: promptF, AUTOBUILD_TASK_ID: t.id, AUTOBUILD_VERIFY: t.verify });
 	fs.appendFileSync(logf, w.out); if (w.code !== 0) fs.appendFileSync(logf, `\n[worker exited ${w.code}]\n`);
+	// capture EVERY session the worker (+ any subagents it spawned) produced during that spawn
+	if (SDB && _workerId) { try {
+		const cap = S.captureNewSessions(SDB, RUN_ID, _workerId, _sessBefore);
+		if (cap.length) fs.appendFileSync(logf, `\n[captured ${cap.length} session(s): ${cap.map(c => c.session_id.slice(0, 8) + "(" + c.events + "ev)").join(", ")}]\n`);
+	} catch (e) {
+		fs.appendFileSync(logf, `\n[session capture error: ${e.message}]\n`);
+		if (e.code === "BUDGET") { console.error(`🛑 HALT: ${e.message}`); regenDashboard(); process.exit(1); }
+	} }
 
 	const v = run(t.verify);
 	fs.appendFileSync(logf, `\n=== verify (${t.verify}) exit=${v.code} ===\n${v.out.slice(0, 8000)}\n`);
 	if (v.code !== 0) {
+		if (SDB && _workerId) { try { S.finalizeWorker(SDB, _workerId, { duration_ms: Date.now() - _wStart, verify_cmd: t.verify, verify_exit: v.code, status: "red", committed_sha: null }); } catch {} }
 		progress[t.id].last_error = v.out; progress[t.id].status = "pending"; saveP(progress); regenDashboard();
 		if (att >= RETRY_CAP) {
 			progress[t.id].status = "blocked"; saveP(progress); regenDashboard();
@@ -166,6 +194,7 @@ while (processed < MAX) {
 	let sha = null;
 	const cr = spawnSync("git", ["commit", "-q", "-m", `${t.commit}\n\n[autobuild · ${t.id} · verify green · attempt ${att}]`], { cwd: WT, encoding: "utf8" });
 	sha = cr.status === 0 ? spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: WT, encoding: "utf8" }).stdout.trim() : "(no changes / commit skipped)";
+	if (SDB && _workerId) { try { S.finalizeWorker(SDB, _workerId, { duration_ms: Date.now() - _wStart, verify_cmd: t.verify, verify_exit: v.code, status: "green", committed_sha: sha }); } catch {} }
 	progress[t.id].status = "done"; progress[t.id].sha = sha; progress[t.id].last_error = null;
 	saveP(progress); regenDashboard();
 	console.log(`✅ ${t.id} done — ${sha}`);
