@@ -27,6 +27,33 @@
       "commit": "docs(kanban): card layout + discover stub (M0-3)",
       "depends_on": ["M0-1"], "needs_review": false,
       "files": ["agentdb/kb/discover.js", "agentdb/kb/discover.test.js"]
+    },
+    {
+      "id": "M1-1", "module": "M1", "title": "Hand-rolled frontmatter+body parser",
+      "spec": "Create agentdb/kb/parse.js: parseCardFile(path) -> {file, frontmatter, body}. Split '---' YAML frontmatter from markdown body; parse the §5.1 subset only (scalars, [a,b] inline arrays, 'key:' block lists). Return the frontmatter as a JS object the M0-1 schema expects. Zero deps (decision D3). Also write agentdb/kb/parse.test.js using the fixtures from M0-1 (good.card.md parses to a valid object; bad-status.card.md parses to an object whose status fails schema validation).",
+      "req": "REQ-M1-1: good.card.md parses to the exact frontmatter object M0-1's validateCard accepts; arrays (depends_on, tags) parse correctly.",
+      "verify": "node --test agentdb/kb/parse.test.js",
+      "commit": "feat(kanban): hand-rolled card parser (M1-1)",
+      "depends_on": ["M0-1"], "needs_review": false,
+      "files": ["agentdb/kb/parse.js", "agentdb/kb/parse.test.js"]
+    },
+    {
+      "id": "M1-2", "module": "M1", "title": "Workspace-wide discovery",
+      "spec": "Extend agentdb/kb/discover.js (created in M0-3) with findCardsWorkspace(roots) that walks ~/Projects/*/.kanban/cards/ (plus env KANBAN_ROOTS extras) -> full sorted, deduped inventory of .card.md paths. Keep the single-root findCards(root) from M0-3 working. Update agentdb/kb/discover.test.js to cover both.",
+      "req": "REQ-M1-2: over a 2-project fixture tree, findCardsWorkspace returns the right count and order, deduped.",
+      "verify": "node --test agentdb/kb/discover.test.js",
+      "commit": "feat(kanban): workspace-wide card discovery (M1-2)",
+      "depends_on": ["M0-3"], "needs_review": false,
+      "files": ["agentdb/kb/discover.js", "agentdb/kb/discover.test.js"]
+    },
+    {
+      "id": "M1-3", "module": "M1", "title": "Validator with file:line errors",
+      "spec": "Create agentdb/kb/validate.js: validateCardFile(path) -> {ok, errors[]} using parse.js (M1-1) + schema-card.js (M0-1). Each error carries file:line so a human/agent can fix it. validateTree(root) validates every discovered card. Exit !=0 from a CLI helper on any invalid card.",
+      "req": "REQ-M1-3: a tree with one bad card reports it precisely (file:line) and returns ok=false; a clean tree returns ok=true.",
+      "verify": "node --test agentdb/kb/validate.test.js",
+      "commit": "feat(kanban): card validator w/ file:line errors (M1-3)",
+      "depends_on": ["M1-1"], "needs_review": false,
+      "files": ["agentdb/kb/validate.js", "agentdb/kb/validate.test.js"]
     }
   ]
 }
