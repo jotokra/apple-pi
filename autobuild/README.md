@@ -47,6 +47,26 @@ Full autonomy is the goal; the **hard halts are what make it responsible**:
 The residual risk (a silent semantic bug the tests don't cover) is mitigated by
 TDD-first; if a behavior matters, write its test first so the gate enforces it.
 
+## Session capture (agent + subagent memory)
+
+At the **start of every run** the orchestrator opens a durable SQLite store
+(`~/.pi/agent/agent.db` by default — the seed of apple-pi's unified agent DB)
+and captures **every session produced during the run**: the worker spawn **and**
+any subagents it spawns. Mechanism: snapshot the pi sessions dir before each
+worker spawn; after, every *new* session file is ingested in full — one row per
+event, original payload retained — and linked to the task/attempt. This is long-
+retention memory for future analysis (the self-improvement loop analyzes these
+sessions to improve the builder itself).
+
+A **disk-budget guard** caps the metadata store at **30% of available disk**
+(`AUTOBUILD_DISK_BUDGET_PCT`). If a capture would exceed it, the orchestrator
+**HALTs cleanly — it never auto-prunes** (long retention is the point). Override
+with an absolute ceiling via `AUTOBUILD_DISK_BUDGET_BYTES`. Budget math uses
+Node's `fs.statfsSync`, so it's correct on macOS (`df` reports 512-byte blocks).
+
+Capture is **non-fatal**: a capture error is logged to the task log and never
+breaks the build (only the budget-HALT stops the run).
+
 ## Configure (all env, all optional)
 
 | Var | Default | Meaning |
@@ -56,6 +76,10 @@ TDD-first; if a behavior matters, write its test first so the gate enforces it.
 | `AUTOBUILD_WORKER` | `pi -a -p "$(cat $AUTOBUILD_PROMPT_FILE)"` | the worker; override to use another agent or a fake worker in tests |
 | `AUTOBUILD_REGRESSION` | `""` (skip) | a command run after each green task; non-zero exit HALTS (e.g. `node --test`, `make test`) |
 | `AUTOBUILD_RETRY_CAP` | `3` | fix-loop attempts before a task is blocked |
+| `AUTOBUILD_DB` | `~/.pi/agent/agent.db` | session-capture DB (seed of the unified agent DB; created if absent) |
+| `AUTOBUILD_SESSIONS_DIR` | `~/.pi/sessions` | where pi writes session JSONL (diffed per worker spawn) |
+| `AUTOBUILD_DISK_BUDGET_PCT` | `30` | metadata-store ceiling as % of available disk |
+| `AUTOBUILD_DISK_BUDGET_BYTES` | _(unset)_ | absolute budget override (also lets tests force a tiny budget) |
 
 The orchestrator passes the worker `AUTOBUILD_PROMPT_FILE`, `AUTOBUILD_TASK_ID`,
 `AUTOBUILD_VERIFY` as env, so a custom worker can be as smart as you like.
@@ -98,9 +122,10 @@ See `autobuild.tasks.example.json` for a runnable 2-task example.
 
 Mechanics **proven**: the judge logic (task selection, verify-judging,
 commit-on-green, retry→block, regression gate, resumability) is exercised by a
-deterministic, **LLM-free** smoke (`smoke/autobuild-judge.sh`) using fake
-workers. The default `pi` worker is the live-agent path; validate it on one
-real task in your project before arming the schedule unattended.
+deterministic, **LLM-free** smoke (`smoke/autobuild-judge.sh`), and session
+capture (worker+subagent diff, full ingest, id/tool extraction, budget HALT) by
+`smoke/autobuild-sessions.sh` — both using fake workers/sessions, no model. The
+default `pi` worker is the live-agent path, validated end-to-end on a real task.
 
 ## See also
 
