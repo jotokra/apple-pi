@@ -1,0 +1,32 @@
+{
+  "_comment": "Machine queue derived from ROADMAP.md (ROADMAP = human truth, this = derived index). Orchestrator reads this + progress.json. Grow module-by-module as the build proceeds. Schema per task: id, module, title, spec, req, verify (shell, run in worktree root, exit 0 = pass), commit, depends_on, needs_review (halts for human review before commit), files (hints for the worker).",
+  "tasks": [
+    {
+      "id": "M0-1", "module": "M0", "title": "Card frontmatter schema + fixtures",
+      "spec": "Write agentdb/kb/schema-card.js exporting validateCard(frontmatterObject) -> {ok:boolean, errors:string[]} for the SUPERPROMPT §5.1 schema (id/title/status/priority/project/assignee/parent/depends_on/tags/est_commits/parallel_safe/created_at/updated_at). NOTE: 'blocks' is NOT a field (D6 — derived). status enum: triage|backlog|todo|in_progress|blocked|review|done. Add fixtures agentdb/test/fixtures/good.card.md + bad-status.card.md (raw files for later parser use; the M0-1 TEST validates JS objects, not raw files — parsing is M1-1).",
+      "req": "REQ-M0-1: schema accepts a good object and rejects a bad-status object with a field-specific error.",
+      "verify": "node --test agentdb/kb/schema-card.test.js",
+      "commit": "feat(kanban): card frontmatter schema + fixtures (M0-1)",
+      "depends_on": [], "needs_review": false,
+      "files": ["agentdb/kb/schema-card.js", "agentdb/kb/schema-card.test.js", "agentdb/test/fixtures/good.card.md", "agentdb/test/fixtures/bad-status.card.md"]
+    },
+    {
+      "id": "M0-2", "module": "M0", "title": "Status enum + transition map + WIP",
+      "spec": "Extend agentdb/kb/schema-card.js (or a new agentdb/kb/status.js) with a legal-transition map for the status enum and WIP limit on in_progress (default 3, env KANBAN_WIP). legalTransition(from,to)->bool; wipLimit()->number.",
+      "req": "REQ-M0-2: illegal transitions (e.g. done->in_progress) rejected; WIP read from env with fallback 3.",
+      "verify": "node --test agentdb/kb/status.test.js",
+      "commit": "feat(kanban): status enum + transitions + WIP (M0-2)",
+      "depends_on": ["M0-1"], "needs_review": false,
+      "files": ["agentdb/kb/status.js", "agentdb/kb/status.test.js"]
+    },
+    {
+      "id": "M0-3", "module": "M0", "title": "Layout convention + discover stub",
+      "spec": "agentdb/kb/discover.js: findCards(root) -> sorted .card.md paths under root, ignoring node_modules/.git/.index. Doc the layout Projects/<proj>/.kanban/{roadmap.md,cards/*.card.md,topics/} in a header comment.",
+      "req": "REQ-M0-3: discovers N cards in a fixture tree; ignores node_modules/.git.",
+      "verify": "node --test agentdb/kb/discover.test.js",
+      "commit": "docs(kanban): card layout + discover stub (M0-3)",
+      "depends_on": ["M0-1"], "needs_review": false,
+      "files": ["agentdb/kb/discover.js", "agentdb/kb/discover.test.js"]
+    }
+  ]
+}
