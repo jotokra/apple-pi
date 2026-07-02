@@ -42,7 +42,7 @@ J
 
 run_orch() {
 	( cd "$WORK" && AUTOBUILD_TASKS="$WORK/autobuild.tasks.json" \
-		AUTOBUILD_STATE="$STATE" AUTOBUILD_WORKER="bash $WORK/worker.sh" \
+		AUTOBUILD_STATE="$STATE" AUTOBUILD_DB="$STATE/db.sqlite" AUTOBUILD_WORKER="bash $WORK/worker.sh" \
 		AUTOBUILD_REGRESSION="" AUTOBUILD_RETRY_CAP=2 \
 		"$NODE" "$REPO/autobuild/orchestrator.js" )
 }
