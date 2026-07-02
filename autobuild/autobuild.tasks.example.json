@@ -1,0 +1,21 @@
+{
+  "_comment": "Example autobuild task queue. Each task is atomic + independently verifiable. The orchestrator runs them in order (or by depends_on), TDD, one commit each. Copy to ./autobuild.tasks.json and edit. verify = a shell command (cwd = project root) that exits 0 when the task is done. needs_review = true HALTS for a human before committing (use for security-sensitive tasks).",
+  "tasks": [
+    {
+      "id": "EX-1", "module": "example", "title": "Add an add(a,b) helper, TDD",
+      "spec": "Create src/math.js exporting add(a,b)=>a+b. Write test/test-math.test.js first (node:test), run it red, implement, run green.",
+      "req": "REQ-EX-1: add(2,3)===5.",
+      "verify": "node --test test/test-math.test.js",
+      "commit": "feat(example): add() helper (EX-1)",
+      "depends_on": [], "needs_review": false
+    },
+    {
+      "id": "EX-2", "module": "example", "title": "Add a mul(a,b) helper, TDD",
+      "spec": "Extend src/math.js with mul(a,b)=>a*b. TDD as above.",
+      "req": "REQ-EX-2: mul(2,3)===6.",
+      "verify": "node --test test/test-math.test.js",
+      "commit": "feat(example): mul() helper (EX-2)",
+      "depends_on": ["EX-1"], "needs_review": false
+    }
+  ]
+}
