@@ -25,6 +25,21 @@ const { spawnSync, execSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
+// Recursively list *.test.js under a dir (Node's `--test <dir>` does NOT scan a
+// directory — it treats the arg as a file. We must pass explicit files.)
+function findTestFiles(dir) {
+	const out = [];
+	if (!fs.existsSync(dir)) return out;
+	for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+		const p = path.join(dir, e.name);
+		if (e.isDirectory()) out.push(...findTestFiles(p));
+		else if (/\.test\.js$/.test(e.name)) out.push(p);
+	}
+	return out.sort();
+}
+// Parse node:test TAP summary for the fail count (# fail N).
+function failCount(tap) { const m = String(tap).match(/^# fail\s+(\d+)/m); return m ? parseInt(m[1], 10) : 0; }
+
 const WT = process.cwd();                                   // run from the worktree root
 const BUILD = path.join(WT, "agentdb", "build");
 const TASKS = JSON.parse(fs.readFileSync(path.join(BUILD, "tasks.json"), "utf8")).tasks;
@@ -141,12 +156,18 @@ let processed = 0;
 		const v = run(t.verify);
 		fs.appendFileSync(logf, `\n=== verify (${t.verify}) exit=${v.code} ===\n${v.out.slice(0, 8000)}\n`);
 		if (v.code === 0) {
-			// regression gate: whole agentdb test tree must stay green
-			const reg = run("node --test agentdb 2>&1 || true"); // tolerate "no tests" in dirs w/o tests
-			fs.appendFileSync(logf, `\n=== regression (node --test agentdb) exit handled ===\n${(reg.out || "").slice(-4000)}\n`);
-			const regFail = /failing|✖|not ok/i.test(reg.out) && !/0 failing/.test(reg.out) && /tests? (\d+)/.test(reg.out);
+			// regression gate: EVERY *.test.js under agentdb must stay green
+			const testFiles = findTestFiles(path.join(WT, "agentdb"));
+			let regFail = false, regOut = "";
+			if (testFiles.length === 0) { regOut = "(no test files yet — regression skipped)"; }
+			else {
+				const reg = run("node --test " + testFiles.map(f => `"${f}"`).join(" "));
+				regOut = reg.out;
+				regFail = reg.code !== 0 || failCount(reg.out) > 0 || /^not ok /m.test(reg.out);
+			}
+			fs.appendFileSync(logf, `\n=== regression (node --test <all agentdb *.test.js: ${testFiles.length}>) ===\n${regOut.slice(-4000)}\n`);
 			if (regFail) {
-				progress[t.id].status = "blocked"; progress[t.id].last_error = "REGRESSION: full suite red after this task:\n" + reg.out.slice(-2000);
+				progress[t.id].status = "blocked"; progress[t.id].last_error = "REGRESSION: full suite red after this task:\n" + regOut.slice(-2000);
 				saveProgress(progress); regenDashboard();
 				console.error(`🛑 HALT: ${t.id} passed its own verify but broke the regression suite. See ${logf}`); process.exit(1);
 			}
