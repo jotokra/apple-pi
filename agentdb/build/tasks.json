@@ -54,6 +54,51 @@
       "commit": "feat(kanban): card validator w/ file:line errors (M1-3)",
       "depends_on": ["M1-1"], "needs_review": false,
       "files": ["agentdb/kb/validate.js", "agentdb/kb/validate.test.js"]
+    },
+    {
+      "id": "M2-1", "module": "M2", "title": "Tier-A index schema.sql + db.js",
+      "spec": "Create agentdb/lib/db.js (open(mode), dbPath()->a project-local kanban agent.db, piDir()) and agentdb/lib/schema.sql with the Tier-A kb_* tables per SUPERPROMPT section 5.2: kb_cards (id,title,status,priority,project,assignee,parent,tags_json,file_path,frontmatter_json,body,updated_at,file_hash), kb_body_fts (FTS5 over title,body), kb_deps(from_id,to_id), kb_meta(file_path,mtime,file_hash). Idempotent CREATE IF NOT EXISTS. Write agentdb/lib/schema.test.js that loads schema.sql into a TEMP node:sqlite DB and asserts all 4 kb_* tables exist and FTS5 is available (PRAGMA compile_options).",
+      "req": "REQ-M2-1: loading schema.sql is clean; all 4 kb_* tables present; FTS5 available.",
+      "verify": "node --test agentdb/lib/schema.test.js",
+      "commit": "feat(agentdb): tier-A kb schema.sql + db.js (M2-1)",
+      "depends_on": ["M1-1"], "needs_review": false,
+      "files": ["agentdb/lib/db.js", "agentdb/lib/schema.sql", "agentdb/lib/schema.test.js"]
+    },
+    {
+      "id": "M2-2", "module": "M2", "title": "kb full rebuild (DROP kb_* ONLY)",
+      "spec": "agentdb/kb/index.js rebuild(db): DROP only kb_cards/kb_body_fts/kb_deps/kb_meta then recreate + walk all cards (discover M1-2 + parse M1-1 + validate M1-3) and INSERT. MUST NEVER touch any non-kb_ table (the tier-isolation contract). Write agentdb/kb/index.test.js: create a dummy non-kb table with a row, rebuild kb over fixtures, assert kb rows correct AND the non-kb table+row survive unchanged.",
+      "req": "REQ-M2-2: rebuild is deterministic; a seeded non-kb table is byte-identical before/after (tier isolation).",
+      "verify": "node --test agentdb/kb/index.test.js",
+      "commit": "feat(kanban): kb full rebuild — DROP kb_* only (M2-2)",
+      "depends_on": ["M2-1"], "needs_review": false,
+      "files": ["agentdb/kb/index.js", "agentdb/kb/index.test.js"]
+    },
+    {
+      "id": "M2-3", "module": "M2", "title": "kb incremental index (mtime+hash)",
+      "spec": "agentdb/kb/index.js index(db): compare kb_meta mtime+content-hash; upsert only changed cards; delete rows for removed files; refresh kb_deps from depends_on. Write agentdb/kb/incremental.test.js: touch one card -> only its row changes; delete a card -> its row+edges gone; untouched cards not rewritten.",
+      "req": "REQ-M2-3: incremental touches only changed/removed cards.",
+      "verify": "node --test agentdb/kb/incremental.test.js",
+      "commit": "feat(kanban): kb incremental index (M2-3)",
+      "depends_on": ["M2-2"], "needs_review": false,
+      "files": ["agentdb/kb/incremental.test.js"]
+    },
+    {
+      "id": "M2-4", "module": "M2", "title": "ensureCurrent reconcile",
+      "spec": "agentdb/kb/index.js ensureCurrent(db): if kb_* empty/missing -> rebuild; if any card newer than its kb_meta or count mismatch -> incremental. Write agentdb/kb/ensure.test.js.",
+      "req": "REQ-M2-4: missing kb -> rebuild transparently; fresh -> no-op.",
+      "verify": "node --test agentdb/kb/ensure.test.js",
+      "commit": "feat(kanban): kb ensureCurrent reconcile (M2-4)",
+      "depends_on": ["M2-3"], "needs_review": false,
+      "files": ["agentdb/kb/ensure.test.js"]
+    },
+    {
+      "id": "M2-5", "module": "M2", "title": "kb truth-mutation writer (REVIEW — path safety)",
+      "spec": "agentdb/kb/write.js: createCard/moveStatus/setField that edit the .card.md (the TRUTH) preserving everything else byte-for-byte, then reindex that file. PATH SAFETY (red-blue): reject '..', absolute, out-of-tree, and non-.card.md targets; enforce status transitions (M0-2); auto-stamp updated_at. Write agentdb/kb/write.test.js with ABUSE CASES FIRST (path traversal rejected, illegal transition rejected, no file written on reject, move diff == 2 lines).",
+      "req": "REQ-M2-5: abuse paths rejected with no write; legal move diff is exactly status+updated_at lines.",
+      "verify": "node --test agentdb/kb/write.test.js",
+      "commit": "feat(kanban): kb truth-mutation writer + path safety (M2-5)",
+      "depends_on": ["M2-2"], "needs_review": true,
+      "files": ["agentdb/kb/write.js", "agentdb/kb/write.test.js"]
     }
   ]
 }
