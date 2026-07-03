@@ -59,9 +59,22 @@ const MAX = flag("once") ? 1 : (val("max-tasks") ? parseInt(val("max-tasks"), 10
 const DRY = flag("dry-run");
 const ONLY = val("module");
 
-// --- single instance ---
-if (fs.existsSync(LOCK)) { console.error(`autobuild: already running (lockfile ${LOCK}). Delete if stale.`); process.exit(2); }
-fs.writeFileSync(LOCK, String(process.pid));
+// --- single instance (atomic O_EXCL + stale-PID steal) ---
+// openSync('wx') is O_WRONLY|O_CREAT|O_EXCL — atomic vs the old existsSync→write
+// TOCTOU race that let two overlapping fires both pass and run concurrently.
+// If a holder was SIGKILL'd mid-run (stale lock), its dead PID is detected and stolen.
+function acquireLock() {
+	try { const fd = fs.openSync(LOCK, "wx"); fs.writeSync(fd, String(process.pid)); fs.closeSync(fd); return; }
+	catch (e) {
+		if (e.code !== "EEXIST") throw e;
+		let stale = false;
+		try { const pid = parseInt(fs.readFileSync(LOCK, "utf8").trim(), 10); if (pid) { try { process.kill(pid, 0); } catch { stale = true; } } else stale = true; }
+		catch { stale = true; }
+		if (stale) { try { fs.unlinkSync(LOCK); } catch {} return acquireLock(); }
+		console.error(`autobuild: already running (lockfile ${LOCK}, holder PID alive). Delete if stale.`); process.exit(2);
+	}
+}
+acquireLock();
 const release = () => { try { fs.unlinkSync(LOCK); } catch {} };
 process.on("exit", release); process.on("SIGINT", () => { release(); process.exit(130); }); process.on("SIGTERM", () => { release(); process.exit(143); });
 
