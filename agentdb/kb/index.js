@@ -269,4 +269,82 @@ function index(db, root = process.cwd()) {
 	return { ok: skipped.length === 0, upserted, removed, skipped };
 }
 
-module.exports = { rebuild, index, KB_TABLES, sha256hex };
+// ensureCurrent(db, root) -> { action, ... } — LAZY reconcile gate (M2-4).
+// SUPERPROMPT §5.2: the query path calls this before touching the mirror so the
+// kb_* tier is always correct with NO manual rebuild/incremental bookkeeping on
+// the caller. It only DECIDES which primitive to run (rebuild / index / none);
+// the primitive is the source of truth for the actual work. Decision tree:
+//
+//   - kb_meta table MISSING          -> full rebuild (no meta to diff against;
+//                                       the "rm agent.db" extreme where schema
+//                                       was never applied / tier was dropped)
+//   - kb_meta EMPTY + cards on disk  -> full rebuild (mirror was never built;
+//                                       the realistic open()-after-delete path:
+//                                       open() reapplies schema CREATE IF NOT
+//                                       EXISTS, so kb_* reappear EMPTY)
+//   - kb_meta EMPTY + no cards       -> no-op          (vacuously current)
+//   - count(meta) != count(files)    -> incremental index (adds / removes)
+//   - any card newer than its kb_meta -> incremental index (content drift)
+//   - otherwise                       -> no-op          (already current)
+//
+// The incremental triggers deliberately OVER-trigger then delegate: the mtime
+// gate is the lazy "is anything possibly stale?" check (matches index()'s
+// mtime fast-path); index() is the AUTHORITATIVE reindex (mtime+hash, removals,
+// upserts). rebuild() remains the always-available authoritative reset.
+//
+// Returns:
+//   action : "rebuild" | "incremental" | "noop"
+//   plus the primitive's own fields (rebuild: ok/inserted/skipped;
+//   incremental: ok/upserted/removed/skipped; noop: none).
+function ensureCurrent(db, root = process.cwd()) {
+	const files = findCards(root);
+
+	// (1) kb_meta table missing -> cannot diff -> full rebuild (recreates the
+	//     whole kb_* tier from the canonical schema + indexes every card).
+	const metaTableMissing = !db.prepare(
+		"SELECT name FROM sqlite_master WHERE type='table' AND name='kb_meta'",
+	).get();
+	if (metaTableMissing) return { action: "rebuild", ...rebuild(db, root) };
+
+	// (2) kb_meta EMPTY: mirror was either never built or fully drained.
+	const metaCount = db.prepare("SELECT count(*) c FROM kb_meta").get().c;
+	if (metaCount === 0) {
+		// no cards on disk either -> already current (vacuously); avoid a needless
+		// DROP+recreate over an empty tree.
+		if (files.length === 0) return { action: "noop" };
+		return { action: "rebuild", ...rebuild(db, root) };
+	}
+
+	// (3) count mismatch (meta rows vs files on disk) -> incremental.
+	if (metaCount !== files.length) return { action: "incremental", ...index(db, root) };
+
+	// (4) any card newer than its kb_meta.mtime (or a new file with no meta row)
+	//     -> incremental. mtime is the lazy gate; index() is authoritative.
+	if (hasNewerCard(db, files)) return { action: "incremental", ...index(db, root) };
+
+	// (5) current -> no-op.
+	return { action: "noop" };
+}
+
+// hasNewerCard(db, files) -> bool — does any current card file look stale vs its
+// kb_meta row? A file is "newer" if it has NO kb_meta row (never indexed / new)
+// OR its current mtime is greater than the stored kb_meta.mtime. A transient
+// stat error on one file is skipped (best-effort, like the rest of kb); index()
+// is the authoritative reconciler and would report it.
+function hasNewerCard(db, files) {
+	const selMeta = db.prepare("SELECT mtime FROM kb_meta WHERE file_path = ?");
+	for (const f of files) {
+		let stat;
+		try {
+			stat = fs.statSync(f);
+		} catch {
+			continue;
+		}
+		const meta = selMeta.get(f);
+		if (!meta) return true; // new file: never indexed
+		if (stat.mtimeMs > meta.mtime) return true; // content-drift: mtime moved
+	}
+	return false;
+}
+
+module.exports = { rebuild, index, ensureCurrent, KB_TABLES, sha256hex };
