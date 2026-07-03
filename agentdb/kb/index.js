@@ -120,4 +120,153 @@ function rebuild(db, root = process.cwd()) {
 	return { ok: skipped.length === 0, inserted, skipped };
 }
 
-module.exports = { rebuild, KB_TABLES, sha256hex };
+// index(db, root) -> { ok, upserted, removed, skipped } — INCREMENTAL reindex
+// (M2-3). Unlike rebuild (which DROPs + recreates the whole kb_* tier), index
+// touches ONLY changed/new cards and deletes rows for removed files, leaving
+// every untouched row byte-for-byte in place. This is what makes a reindex
+// O(changed files), not O(all files).
+//
+// Change detection (per file, from kb_meta — the M2-3 key table):
+//   - stored mtime == current mtime AND stored hash == current hash -> UNCHANGED
+//     (the mtime fast-path: one stat, no read/hash/parse, zero writes). mtime is
+//     the quick gate; this is the standard incremental-indexer trade-off and is
+//     safe because a real edit always moves mtime, and rebuild() reconciles
+//     anything mtime missed at any time.
+//   - hash identical but mtime differs (e.g. an editor that touched the file
+//     without changing it) -> mtime drift: refresh kb_meta.mtime ONLY, do NOT
+//     rewrite the card row (its rowid stays stable).
+//   - hash differs (or file is new) -> CHANGED: re-parse + re-validate, upsert
+//     kb_cards, refresh that card's forward edges from depends_on, swap its FTS
+//     row, refresh kb_meta.
+//   - a file present in kb_meta but no longer on disk -> REMOVED: delete its
+//     kb_cards row, its forward kb_deps edges, its kb_meta row, and its FTS entry.
+//
+// Order: removals are applied BEFORE upserts so a rename (old path removed, new
+// path added, same id) reconciles to a single upserted row rather than a delete
+// racing an insert.
+//
+// FTS linkage limitation: kb_body_fts has no card-id column (the schema ships it
+// standalone by design — M2-2), so a changed/removed card's old FTS row is
+// matched by its OLD (title, body) read from kb_cards just before the upsert.
+// Two cards sharing an identical title+body would therefore over-delete; that
+// does not arise for a single-user kanban, and rebuild() is always the
+// authoritative reconciliation. Mirrors rebuild's best-effort posture: an
+// unreadable/unparseable/invalid card is skipped + reported, not fatal.
+//
+// Returns:
+//   ok       : true iff no card was skipped
+//   upserted : # of card rows written (changed + new)
+//   removed  : # of card rows deleted (files gone)
+//   skipped  : [{ file, errors: string[] }] for cards not indexed
+function index(db, root = process.cwd()) {
+	const selMeta = db.prepare("SELECT mtime, file_hash FROM kb_meta WHERE file_path = ?");
+	const selCardByPath = db.prepare("SELECT id, title, body FROM kb_cards WHERE file_path = ?");
+	const delCardById = db.prepare("DELETE FROM kb_cards WHERE id = ?");
+	const delDepsByFrom = db.prepare("DELETE FROM kb_deps WHERE from_id = ?");
+	const delFtsByContent = db.prepare("DELETE FROM kb_body_fts WHERE title = ? AND body = ?");
+	const delMetaByPath = db.prepare("DELETE FROM kb_meta WHERE file_path = ?");
+
+	const insCard = db.prepare(
+		`INSERT OR REPLACE INTO kb_cards
+		   (id, title, status, priority, project, assignee, parent, tags_json,
+		    file_path, frontmatter_json, body, updated_at, file_hash)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+	);
+	const insFts = db.prepare(`INSERT INTO kb_body_fts (title, body) VALUES (?,?)`);
+	const insDep = db.prepare(`INSERT OR IGNORE INTO kb_deps (from_id, to_id) VALUES (?,?)`);
+	const insMeta = db.prepare(`INSERT OR REPLACE INTO kb_meta (file_path, mtime, file_hash) VALUES (?,?,?)`);
+
+	const currentFiles = findCards(root);
+	const currentSet = new Set(currentFiles);
+	const existingPaths = new Set(
+		db.prepare("SELECT file_path FROM kb_meta").all().map(r => r.file_path),
+	);
+
+	const skipped = [];
+	let upserted = 0;
+	let removed = 0;
+
+	// (1) REMOVALS — meta paths no longer on disk. Done first so a rename
+	//     reconciles with the upsert below.
+	for (const fp of existingPaths) {
+		if (currentSet.has(fp)) continue;
+		const old = selCardByPath.get(fp); // {id,title,body} | undefined
+		if (old) {
+			delCardById.run(old.id);
+			delDepsByFrom.run(old.id);
+			delFtsByContent.run(old.title, old.body);
+		}
+		delMetaByPath.run(fp);
+		removed++;
+	}
+
+	// (2) UPSERTS — per current file: unchanged (skip) | mtime-drift (meta only) |
+	//     changed/new (full upsert) | invalid (drop + report).
+	for (const file of currentFiles) {
+		let stat, content, hash, mtime;
+		try {
+			stat = fs.statSync(file);
+			content = fs.readFileSync(file, "utf8");
+			hash = sha256hex(content);
+			mtime = stat.mtimeMs;
+		} catch (e) {
+			skipped.push({ file, errors: [`${file}: could not read (${e.message})`] });
+			continue;
+		}
+
+		const meta = selMeta.get(file);
+		if (meta && meta.mtime === mtime && meta.file_hash === hash) continue; // UNCHANGED
+		if (meta && meta.file_hash === hash) { insMeta.run(file, mtime, hash); continue; } // mtime drift
+
+		// CHANGED or NEW — re-parse + re-validate.
+		let parsed, vr;
+		try {
+			parsed = parseCardFile(file);
+			vr = validateCard(parsed.frontmatter);
+		} catch (e) {
+			skipped.push({ file, errors: [`${file}: could not parse (${e.message})`] });
+			continue;
+		}
+		if (!vr.ok) {
+			// card no longer validates: drop any stale mirror rows for it (mirrors
+			// rebuild, which would not have indexed it), then report.
+			const old = selCardByPath.get(file);
+			if (old) {
+				delCardById.run(old.id);
+				delDepsByFrom.run(old.id);
+				delFtsByContent.run(old.title, old.body);
+			}
+			delMetaByPath.run(file);
+			skipped.push({ file, errors: vr.errors.map(e => `${file}: ${e}`) });
+			continue;
+		}
+
+		const fm = parsed.frontmatter;
+		// swap the card's OLD FTS row (content linkage) before the upsert overwrites it
+		const old = selCardByPath.get(file);
+		if (old) delFtsByContent.run(old.title, old.body);
+
+		insCard.run(
+			fm.id, fm.title, fm.status,
+			fm.priority ?? null, fm.project ?? null, fm.assignee ?? null, fm.parent ?? null,
+			JSON.stringify(fm.tags ?? []),
+			file,
+			JSON.stringify(fm),
+			parsed.body,
+			fm.updated_at ?? null,
+			hash,
+		);
+		// refresh this card's forward edges: wipe + reinsert from depends_on
+		delDepsByFrom.run(fm.id);
+		if (Array.isArray(fm.depends_on)) {
+			for (const dep of fm.depends_on) insDep.run(fm.id, dep);
+		}
+		insFts.run(fm.title, parsed.body);
+		insMeta.run(file, mtime, hash);
+		upserted++;
+	}
+
+	return { ok: skipped.length === 0, upserted, removed, skipped };
+}
+
+module.exports = { rebuild, index, KB_TABLES, sha256hex };
