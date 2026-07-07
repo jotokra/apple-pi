@@ -108,6 +108,7 @@ function help() {
   schedule install|status|remove|run-now   manage the daily+weekly jobs
   vault add|list|get|remove|prune-transient   credential vault (headless)
   kanban index [--rebuild]      reindex the kb_* kanban mirror from disk
+  analyze                       run all detectors, print findings, write analysis_*
   update [--check]              release check: local vs GitHub releases (read-only)
   update --all --yes            apply: pi update --all + pull apple-pi + sync pivoice
   update --voice --yes          apply: re-sync just the pivoice bundle from upstream
@@ -152,6 +153,13 @@ function main() {
 			// kanban mirror — delegates to agentdb/cli.js (kb_* index/list/...).
 			const kanbanCli = require(path.join(REPO, "agentdb", "cli.js"));
 			return kanbanCli.run(rest);
+		}
+		case "analyze": {
+			// autonomous, read-only detectors — delegates to
+			// agentdb/analysis/cli.js (writes analysis_runs + analysis_findings
+			// only; never mutates sess_*/kb_*/the world).
+			const analyzeCli = require(path.join(REPO, "agentdb", "analysis", "cli.js"));
+			return analyzeCli.run(rest);
 		}
 		case "update":     return update(rest);
 		default:
