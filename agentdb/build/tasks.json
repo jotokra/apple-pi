@@ -2,131 +2,900 @@
   "_comment": "Machine queue derived from ROADMAP.md (ROADMAP = human truth, this = derived index). Orchestrator reads this + progress.json. Grow module-by-module as the build proceeds. Schema per task: id, module, title, spec, req, verify (shell, run in worktree root, exit 0 = pass), commit, depends_on, needs_review (halts for human review before commit), files (hints for the worker).",
   "tasks": [
     {
-      "id": "M0-1", "module": "M0", "title": "Card frontmatter schema + fixtures",
-      "spec": "Write agentdb/kb/schema-card.js exporting validateCard(frontmatterObject) -> {ok:boolean, errors:string[]} for the SUPERPROMPT §5.1 schema (id/title/status/priority/project/assignee/parent/depends_on/tags/est_commits/parallel_safe/created_at/updated_at). NOTE: 'blocks' is NOT a field (D6 — derived). status enum: triage|backlog|todo|in_progress|blocked|review|done. Add fixtures agentdb/test/fixtures/good.card.md + bad-status.card.md (raw files for later parser use; the M0-1 TEST validates JS objects, not raw files — parsing is M1-1).",
+      "id": "M0-1",
+      "module": "M0",
+      "title": "Card frontmatter schema + fixtures",
+      "spec": "Write agentdb/kb/schema-card.js exporting validateCard(frontmatterObject) -> {ok:boolean, errors:string[]} for the SUPERPROMPT \u00a75.1 schema (id/title/status/priority/project/assignee/parent/depends_on/tags/est_commits/parallel_safe/created_at/updated_at). NOTE: 'blocks' is NOT a field (D6 \u2014 derived). status enum: triage|backlog|todo|in_progress|blocked|review|done. Add fixtures agentdb/test/fixtures/good.card.md + bad-status.card.md (raw files for later parser use; the M0-1 TEST validates JS objects, not raw files \u2014 parsing is M1-1).",
       "req": "REQ-M0-1: schema accepts a good object and rejects a bad-status object with a field-specific error.",
       "verify": "node --test agentdb/kb/schema-card.test.js",
       "commit": "feat(kanban): card frontmatter schema + fixtures (M0-1)",
-      "depends_on": [], "needs_review": false,
-      "files": ["agentdb/kb/schema-card.js", "agentdb/kb/schema-card.test.js", "agentdb/test/fixtures/good.card.md", "agentdb/test/fixtures/bad-status.card.md"]
+      "depends_on": [],
+      "needs_review": false,
+      "files": [
+        "agentdb/kb/schema-card.js",
+        "agentdb/kb/schema-card.test.js",
+        "agentdb/test/fixtures/good.card.md",
+        "agentdb/test/fixtures/bad-status.card.md"
+      ]
     },
     {
-      "id": "M0-2", "module": "M0", "title": "Status enum + transition map + WIP",
+      "id": "M0-2",
+      "module": "M0",
+      "title": "Status enum + transition map + WIP",
       "spec": "Extend agentdb/kb/schema-card.js (or a new agentdb/kb/status.js) with a legal-transition map for the status enum and WIP limit on in_progress (default 3, env KANBAN_WIP). legalTransition(from,to)->bool; wipLimit()->number.",
       "req": "REQ-M0-2: illegal transitions (e.g. done->in_progress) rejected; WIP read from env with fallback 3.",
       "verify": "node --test agentdb/kb/status.test.js",
       "commit": "feat(kanban): status enum + transitions + WIP (M0-2)",
-      "depends_on": ["M0-1"], "needs_review": false,
-      "files": ["agentdb/kb/status.js", "agentdb/kb/status.test.js"]
+      "depends_on": [
+        "M0-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/kb/status.js",
+        "agentdb/kb/status.test.js"
+      ]
     },
     {
-      "id": "M0-3", "module": "M0", "title": "Layout convention + discover stub",
+      "id": "M0-3",
+      "module": "M0",
+      "title": "Layout convention + discover stub",
       "spec": "agentdb/kb/discover.js: findCards(root) -> sorted .card.md paths under root, ignoring node_modules/.git/.index. Doc the layout Projects/<proj>/.kanban/{roadmap.md,cards/*.card.md,topics/} in a header comment.",
       "req": "REQ-M0-3: discovers N cards in a fixture tree; ignores node_modules/.git.",
       "verify": "node --test agentdb/kb/discover.test.js",
       "commit": "docs(kanban): card layout + discover stub (M0-3)",
-      "depends_on": ["M0-1"], "needs_review": false,
-      "files": ["agentdb/kb/discover.js", "agentdb/kb/discover.test.js"]
+      "depends_on": [
+        "M0-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/kb/discover.js",
+        "agentdb/kb/discover.test.js"
+      ]
     },
     {
-      "id": "M1-1", "module": "M1", "title": "Hand-rolled frontmatter+body parser",
-      "spec": "Create agentdb/kb/parse.js: parseCardFile(path) -> {file, frontmatter, body}. Split '---' YAML frontmatter from markdown body; parse the §5.1 subset only (scalars, [a,b] inline arrays, 'key:' block lists). Return the frontmatter as a JS object the M0-1 schema expects. Zero deps (decision D3). Also write agentdb/kb/parse.test.js using the fixtures from M0-1 (good.card.md parses to a valid object; bad-status.card.md parses to an object whose status fails schema validation).",
+      "id": "M1-1",
+      "module": "M1",
+      "title": "Hand-rolled frontmatter+body parser",
+      "spec": "Create agentdb/kb/parse.js: parseCardFile(path) -> {file, frontmatter, body}. Split '---' YAML frontmatter from markdown body; parse the \u00a75.1 subset only (scalars, [a,b] inline arrays, 'key:' block lists). Return the frontmatter as a JS object the M0-1 schema expects. Zero deps (decision D3). Also write agentdb/kb/parse.test.js using the fixtures from M0-1 (good.card.md parses to a valid object; bad-status.card.md parses to an object whose status fails schema validation).",
       "req": "REQ-M1-1: good.card.md parses to the exact frontmatter object M0-1's validateCard accepts; arrays (depends_on, tags) parse correctly.",
       "verify": "node --test agentdb/kb/parse.test.js",
       "commit": "feat(kanban): hand-rolled card parser (M1-1)",
-      "depends_on": ["M0-1"], "needs_review": false,
-      "files": ["agentdb/kb/parse.js", "agentdb/kb/parse.test.js"]
+      "depends_on": [
+        "M0-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/kb/parse.js",
+        "agentdb/kb/parse.test.js"
+      ]
     },
     {
-      "id": "M1-2", "module": "M1", "title": "Workspace-wide discovery",
+      "id": "M1-2",
+      "module": "M1",
+      "title": "Workspace-wide discovery",
       "spec": "Extend agentdb/kb/discover.js (created in M0-3) with findCardsWorkspace(roots) that walks ~/Projects/*/.kanban/cards/ (plus env KANBAN_ROOTS extras) -> full sorted, deduped inventory of .card.md paths. Keep the single-root findCards(root) from M0-3 working. Update agentdb/kb/discover.test.js to cover both.",
       "req": "REQ-M1-2: over a 2-project fixture tree, findCardsWorkspace returns the right count and order, deduped.",
       "verify": "node --test agentdb/kb/discover.test.js",
       "commit": "feat(kanban): workspace-wide card discovery (M1-2)",
-      "depends_on": ["M0-3"], "needs_review": false,
-      "files": ["agentdb/kb/discover.js", "agentdb/kb/discover.test.js"]
+      "depends_on": [
+        "M0-3"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/kb/discover.js",
+        "agentdb/kb/discover.test.js"
+      ]
     },
     {
-      "id": "M1-3", "module": "M1", "title": "Validator with file:line errors",
+      "id": "M1-3",
+      "module": "M1",
+      "title": "Validator with file:line errors",
       "spec": "Create agentdb/kb/validate.js: validateCardFile(path) -> {ok, errors[]} using parse.js (M1-1) + schema-card.js (M0-1). Each error carries file:line so a human/agent can fix it. validateTree(root) validates every discovered card. Exit !=0 from a CLI helper on any invalid card.",
       "req": "REQ-M1-3: a tree with one bad card reports it precisely (file:line) and returns ok=false; a clean tree returns ok=true.",
       "verify": "node --test agentdb/kb/validate.test.js",
       "commit": "feat(kanban): card validator w/ file:line errors (M1-3)",
-      "depends_on": ["M1-1"], "needs_review": false,
-      "files": ["agentdb/kb/validate.js", "agentdb/kb/validate.test.js"]
+      "depends_on": [
+        "M1-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/kb/validate.js",
+        "agentdb/kb/validate.test.js"
+      ]
     },
     {
-      "id": "M2-1", "module": "M2", "title": "Tier-A index schema.sql + db.js",
+      "id": "M2-1",
+      "module": "M2",
+      "title": "Tier-A index schema.sql + db.js",
       "spec": "Create agentdb/lib/db.js (open(mode), dbPath()->a project-local kanban agent.db, piDir()) and agentdb/lib/schema.sql with the Tier-A kb_* tables per SUPERPROMPT section 5.2: kb_cards (id,title,status,priority,project,assignee,parent,tags_json,file_path,frontmatter_json,body,updated_at,file_hash), kb_body_fts (FTS5 over title,body), kb_deps(from_id,to_id), kb_meta(file_path,mtime,file_hash). Idempotent CREATE IF NOT EXISTS. Write agentdb/lib/schema.test.js that loads schema.sql into a TEMP node:sqlite DB and asserts all 4 kb_* tables exist and FTS5 is available (PRAGMA compile_options).",
       "req": "REQ-M2-1: loading schema.sql is clean; all 4 kb_* tables present; FTS5 available.",
       "verify": "node --test agentdb/lib/schema.test.js",
       "commit": "feat(agentdb): tier-A kb schema.sql + db.js (M2-1)",
-      "depends_on": ["M1-1"], "needs_review": false,
-      "files": ["agentdb/lib/db.js", "agentdb/lib/schema.sql", "agentdb/lib/schema.test.js"]
+      "depends_on": [
+        "M1-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/lib/db.js",
+        "agentdb/lib/schema.sql",
+        "agentdb/lib/schema.test.js"
+      ]
     },
     {
-      "id": "M2-2", "module": "M2", "title": "kb full rebuild (DROP kb_* ONLY)",
+      "id": "M2-2",
+      "module": "M2",
+      "title": "kb full rebuild (DROP kb_* ONLY)",
       "spec": "agentdb/kb/index.js rebuild(db): DROP only kb_cards/kb_body_fts/kb_deps/kb_meta then recreate + walk all cards (discover M1-2 + parse M1-1 + validate M1-3) and INSERT. MUST NEVER touch any non-kb_ table (the tier-isolation contract). Write agentdb/kb/index.test.js: create a dummy non-kb table with a row, rebuild kb over fixtures, assert kb rows correct AND the non-kb table+row survive unchanged.",
       "req": "REQ-M2-2: rebuild is deterministic; a seeded non-kb table is byte-identical before/after (tier isolation).",
       "verify": "node --test agentdb/kb/index.test.js",
-      "commit": "feat(kanban): kb full rebuild — DROP kb_* only (M2-2)",
-      "depends_on": ["M2-1"], "needs_review": false,
-      "files": ["agentdb/kb/index.js", "agentdb/kb/index.test.js"]
+      "commit": "feat(kanban): kb full rebuild \u2014 DROP kb_* only (M2-2)",
+      "depends_on": [
+        "M2-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/kb/index.js",
+        "agentdb/kb/index.test.js"
+      ]
     },
     {
-      "id": "M2-3", "module": "M2", "title": "kb incremental index (mtime+hash)",
+      "id": "M2-3",
+      "module": "M2",
+      "title": "kb incremental index (mtime+hash)",
       "spec": "agentdb/kb/index.js index(db): compare kb_meta mtime+content-hash; upsert only changed cards; delete rows for removed files; refresh kb_deps from depends_on. Write agentdb/kb/incremental.test.js: touch one card -> only its row changes; delete a card -> its row+edges gone; untouched cards not rewritten.",
       "req": "REQ-M2-3: incremental touches only changed/removed cards.",
       "verify": "node --test agentdb/kb/incremental.test.js",
       "commit": "feat(kanban): kb incremental index (M2-3)",
-      "depends_on": ["M2-2"], "needs_review": false,
-      "files": ["agentdb/kb/incremental.test.js"]
+      "depends_on": [
+        "M2-2"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/kb/incremental.test.js"
+      ]
     },
     {
-      "id": "M2-4", "module": "M2", "title": "ensureCurrent reconcile",
+      "id": "M2-4",
+      "module": "M2",
+      "title": "ensureCurrent reconcile",
       "spec": "agentdb/kb/index.js ensureCurrent(db): if kb_* empty/missing -> rebuild; if any card newer than its kb_meta or count mismatch -> incremental. Write agentdb/kb/ensure.test.js.",
       "req": "REQ-M2-4: missing kb -> rebuild transparently; fresh -> no-op.",
       "verify": "node --test agentdb/kb/ensure.test.js",
       "commit": "feat(kanban): kb ensureCurrent reconcile (M2-4)",
-      "depends_on": ["M2-3"], "needs_review": false,
-      "files": ["agentdb/kb/ensure.test.js"]
+      "depends_on": [
+        "M2-3"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/kb/ensure.test.js"
+      ]
     },
     {
-      "id": "M2-5", "module": "M2", "title": "kb truth-mutation writer (REVIEW — path safety)",
+      "id": "M2-5",
+      "module": "M2",
+      "title": "kb truth-mutation writer (REVIEW \u2014 path safety)",
       "spec": "agentdb/kb/write.js: createCard/moveStatus/setField that edit the .card.md (the TRUTH) preserving everything else byte-for-byte, then reindex that file. PATH SAFETY (red-blue): reject '..', absolute, out-of-tree, and non-.card.md targets; enforce status transitions (M0-2); auto-stamp updated_at. Write agentdb/kb/write.test.js with ABUSE CASES FIRST (path traversal rejected, illegal transition rejected, no file written on reject, move diff == 2 lines).",
       "req": "REQ-M2-5: abuse paths rejected with no write; legal move diff is exactly status+updated_at lines.",
       "verify": "node --test agentdb/kb/write.test.js",
       "commit": "feat(kanban): kb truth-mutation writer + path safety (M2-5)",
-      "depends_on": ["M2-2"],
+      "depends_on": [
+        "M2-2"
+      ],
       "needs_review": false,
-      "files": ["agentdb/kb/write.js", "agentdb/kb/write.test.js"]
+      "files": [
+        "agentdb/kb/write.js",
+        "agentdb/kb/write.test.js"
+      ]
     },
     {
-      "id": "M3-1", "module": "M3", "title": "Filter queries",
-      "spec": "agentdb/kb/query.js: list({status,project,assignee,tag,priority,parent}) returning card rows from kb_cards. ALL filters parameterized (? placeholders + bound values) — never string-concat user input into SQL (red-blue: SQL injection is the #1 attack surface on a query layer). Unknown filter keys are ignored (forward-compat). Empty filter object = return everything. tag matches ANY-of (card.tags_json contains the tag). priority is exact-match (int). priority may be {min,max} for ranges (AND between min and max). Default ordering: priority DESC NULLS LAST, then id ASC. Write agentdb/kb/query.test.js with abuse cases FIRST: SQL-injection attempts ('1=1; DROP TABLE kb_cards;--', \"' OR '1'='1\") are treated as literal values; user input never reaches the SQL string; non-string values coerced safely; unknown keys ignored without error; no rows leak across projects.",
+      "id": "M3-1",
+      "module": "M3",
+      "title": "Filter queries",
+      "spec": "agentdb/kb/query.js: list({status,project,assignee,tag,priority,parent}) returning card rows from kb_cards. ALL filters parameterized (? placeholders + bound values) \u2014 never string-concat user input into SQL (red-blue: SQL injection is the #1 attack surface on a query layer). Unknown filter keys are ignored (forward-compat). Empty filter object = return everything. tag matches ANY-of (card.tags_json contains the tag). priority is exact-match (int). priority may be {min,max} for ranges (AND between min and max). Default ordering: priority DESC NULLS LAST, then id ASC. Write agentdb/kb/query.test.js with abuse cases FIRST: SQL-injection attempts ('1=1; DROP TABLE kb_cards;--', \"' OR '1'='1\") are treated as literal values; user input never reaches the SQL string; non-string values coerced safely; unknown keys ignored without error; no rows leak across projects.",
       "req": "REQ-M3-1: filters AND-compose correctly; SQL-injection attempts return as literal matches (no exec, no error); range priority works.",
       "verify": "node --test agentdb/kb/query.test.js",
       "commit": "feat(kanban): kb filter queries (M3-1)",
-      "depends_on": ["M2-2"], "needs_review": false,
-      "files": ["agentdb/kb/query.js", "agentdb/kb/query.test.js"]
+      "depends_on": [
+        "M2-2"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/kb/query.js",
+        "agentdb/kb/query.test.js"
+      ]
     },
     {
-      "id": "M3-2", "module": "M3", "title": "Dependency graph + ready() + cycle detect",
-      "spec": "agentdb/kb/graph.js: (1) edges(db) -> [{from,to}] from kb_deps; (2) ready(db) -> ids whose status is 'todo' AND all depends_on ids are 'done' (or absent); (3) detectCycles(db) -> string[] of cycle-paths (e.g. ['A','B','C','A']) — REPORT, never throw (a corrupt kb shouldn't crash the caller); (4) blockedBy(id, db) -> ids that block this card (reverse edge lookup via idx_kb_deps_to); (5) blocks(id, db) -> ids this card blocks (forward edges). Pure functions, no I/O outside the db argument. Write agentdb/kb/graph.test.js covering: a simple chain (A→B→C), a parallel diamond, a self-loop (cycle: A→A), a 3-cycle (A→B→C→A), an unreachable card, a card with no depends_on (always ready if status=todo), ready() excludes blocked cards, ready() excludes in_progress cards (only todo status qualifies).",
+      "id": "M3-2",
+      "module": "M3",
+      "title": "Dependency graph + ready() + cycle detect",
+      "spec": "agentdb/kb/graph.js: (1) edges(db) -> [{from,to}] from kb_deps; (2) ready(db) -> ids whose status is 'todo' AND all depends_on ids are 'done' (or absent); (3) detectCycles(db) -> string[] of cycle-paths (e.g. ['A','B','C','A']) \u2014 REPORT, never throw (a corrupt kb shouldn't crash the caller); (4) blockedBy(id, db) -> ids that block this card (reverse edge lookup via idx_kb_deps_to); (5) blocks(id, db) -> ids this card blocks (forward edges). Pure functions, no I/O outside the db argument. Write agentdb/kb/graph.test.js covering: a simple chain (A\u2192B\u2192C), a parallel diamond, a self-loop (cycle: A\u2192A), a 3-cycle (A\u2192B\u2192C\u2192A), an unreachable card, a card with no depends_on (always ready if status=todo), ready() excludes blocked cards, ready() excludes in_progress cards (only todo status qualifies).",
       "req": "REQ-M3-2: ready() returns only todo cards whose deps are all done; detectCycles returns paths not throws; blockedBy/blocks round-trip via kb_deps.",
       "verify": "node --test agentdb/kb/graph.test.js",
       "commit": "feat(kanban): kb dep graph + ready() + cycles (M3-2)",
-      "depends_on": ["M3-1"], "needs_review": false,
-      "files": ["agentdb/kb/graph.js", "agentdb/kb/graph.test.js"]
+      "depends_on": [
+        "M3-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/kb/graph.js",
+        "agentdb/kb/graph.test.js"
+      ]
     },
     {
-      "id": "M3-3", "module": "M3", "title": "FTS5 search",
-      "spec": "agentdb/kb/search.js: search(q, db, opts={limit=10}) -> [{id, title, snippet, rank}] from kb_body_fts. Use FTS5 bm25() ranking (lower = better; negate for sort-asc). snippet(title,body,'<mark>','</mark>','…',8) for the highlighted hit context. q is the user query — sanitize for FTS5 syntax (escape double-quotes by doubling; quote-wrap if it contains FTS5 operators). Pure function; no side effects. Write agentdb/kb/search.test.js with: a body term ranks its card first (the card containing the literal term beats a card that mentions it only in tags); absent term returns []; FTS5 syntax chars in q are escaped (no syntax error); limit caps the result count; empty q returns [].",
-      "req": "REQ-M3-3: a body term ranks its card first; absent term → empty; FTS5 syntax chars in q do not raise.",
+      "id": "M3-3",
+      "module": "M3",
+      "title": "FTS5 search",
+      "spec": "agentdb/kb/search.js: search(q, db, opts={limit=10}) -> [{id, title, snippet, rank}] from kb_body_fts. Use FTS5 bm25() ranking (lower = better; negate for sort-asc). snippet(title,body,'<mark>','</mark>','\u2026',8) for the highlighted hit context. q is the user query \u2014 sanitize for FTS5 syntax (escape double-quotes by doubling; quote-wrap if it contains FTS5 operators). Pure function; no side effects. Write agentdb/kb/search.test.js with: a body term ranks its card first (the card containing the literal term beats a card that mentions it only in tags); absent term returns []; FTS5 syntax chars in q are escaped (no syntax error); limit caps the result count; empty q returns [].",
+      "req": "REQ-M3-3: a body term ranks its card first; absent term \u2192 empty; FTS5 syntax chars in q do not raise.",
       "verify": "node --test agentdb/kb/search.test.js",
       "commit": "feat(kanban): kb FTS5 search (M3-3)",
-      "depends_on": ["M2-2"], "needs_review": false,
-      "files": ["agentdb/kb/search.js", "agentdb/kb/search.test.js"]
+      "depends_on": [
+        "M2-2"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/kb/search.js",
+        "agentdb/kb/search.test.js"
+      ]
+    },
+    {
+      "id": "M4-1",
+      "module": "M4",
+      "title": "JSONL parser + event normalization",
+      "spec": "agentdb/ingest/sessions.js parse line -> {session_id, seq, type, ts, role, tool_name, tokens_in/out, is_error, content_sha, event_json}. Handle all pi entry types (session, model_change, thinking_level_change, message + future type passthrough). Unknown types: pass through (event_json retained, type recorded).",
+      "req": "REQ-M4-1: each fixture line -> expected normalized row; unknown types pass through.",
+      "verify": "node --test agentdb/ingest/sessions.test.js",
+      "commit": "feat(agentdb): session JSONL parser + normalization (M4-1)",
+      "depends_on": [
+        "M2-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/ingest/sessions.js",
+        "agentdb/ingest/sessions.test.js"
+      ]
+    },
+    {
+      "id": "M4-2",
+      "module": "M4",
+      "title": "Append-only incremental ingest",
+      "spec": "Per-file resume via sess_files(ingested_lines, total_lines, file_hash). Grew -> read from line N+1, append sess_events, upsert sess_sessions aggregates. Hash mismatch on the ingested prefix -> full re-ingest of that session (delete+reinsert its events). O(new lines).",
+      "req": "REQ-M4-2: appending 10 lines to a 100-line session ingests exactly 10 events; rewriting the file re-ingests only that session.",
+      "verify": "node --test agentdb/ingest/incremental.test.js",
+      "commit": "feat(agentdb): append-only session ingest (M4-2)",
+      "depends_on": [
+        "M4-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/ingest/incremental.test.js"
+      ]
+    },
+    {
+      "id": "M4-3",
+      "module": "M4",
+      "title": "Session aggregates + cost",
+      "spec": "Derive sess_sessions rollups (message_count, tokens_in/out, cost, error_count, tool_calls_json, started/ended/last_event_at, model, cwd).",
+      "req": "REQ-M4-3: aggregates match a hand-computed fixture; recompute on re-ingest.",
+      "verify": "node --test agentdb/ingest/aggregates.test.js",
+      "commit": "feat(agentdb): session aggregates + cost (M4-3)",
+      "depends_on": [
+        "M4-2"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/ingest/aggregates.test.js"
+      ]
+    },
+    {
+      "id": "M4-4",
+      "module": "M4",
+      "title": "Retention + prune (opt-in only)",
+      "spec": "No auto-purge (D7). apple-pi db prune --before <date> --dry|--yes deletes sess_events/sess_sessions older than date; default --dry; --yes required to write. Logs the prune to analysis_runs.",
+      "req": "REQ-M4-4: dry-run reports counts, writes nothing; --yes deletes scoped rows; kb_*/analysis_* untouched.",
+      "verify": "node --test agentdb/ingest/prune.test.js",
+      "commit": "feat(agentdb): session prune \u2014 opt-in, scoped (M4-4)",
+      "depends_on": [
+        "M4-3"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/ingest/prune.test.js"
+      ]
+    },
+    {
+      "id": "M5-1",
+      "module": "M5",
+      "title": "analysis_runs bookkeeping",
+      "spec": "Start/end a run, record model/tokens/finding_count; every analyze call is one row. Idempotent within a day NOT required (runs are cheap, keep them for the trend).",
+      "req": "REQ-M5-1: an analyze run creates exactly one analysis_runs row linked to its findings.",
+      "verify": "node --test agentdb/analysis/runs.test.js",
+      "commit": "feat(agentdb): analysis_runs bookkeeping (M5-1)",
+      "depends_on": [
+        "M4-3"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/analysis/runs.js",
+        "agentdb/analysis/runs.test.js"
+      ]
+    },
+    {
+      "id": "M5-2",
+      "module": "M5",
+      "title": "Error + cost findings",
+      "spec": "analyze.js detectors: error_pattern (recurring is_error+tool_name clusters), cost_spike (session cost > rolling p95), model_drift (cost/tokens per turn trending over runs).",
+      "req": "REQ-M5-2: over a seeded sess_* fixture, each detector emits the expected finding with evidence_json.",
+      "verify": "node --test agentdb/analysis/detectors-error-cost.test.js",
+      "commit": "feat(agentdb): analyze \u2014 error/cost/drift findings (M5-2)",
+      "depends_on": [
+        "M5-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/analysis/analyze.js",
+        "agentdb/analysis/detectors-error-cost.test.js"
+      ]
+    },
+    {
+      "id": "M5-3",
+      "module": "M5",
+      "title": "Tool-usage + card-stall findings",
+      "spec": "tool_underuse/tool_overuse (tools never/rarely vs dominantly used), card_stall (cards in in_progress past a threshold, or blocked long). Reads sess_* tool_calls + kb_* statuses.",
+      "req": "REQ-M5-3: fixtures trigger each finding type.",
+      "verify": "node --test agentdb/analysis/detectors-tool-card.test.js",
+      "commit": "feat(agentdb): analyze \u2014 tool-use + card-stall findings (M5-3)",
+      "depends_on": [
+        "M5-2",
+        "M3-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/analysis/detectors-tool-card.test.js"
+      ]
+    },
+    {
+      "id": "M5-4",
+      "module": "M5",
+      "title": "apple-pi analyze CLI (autonomous, read-only)",
+      "spec": "Runs all detectors, prints a findings summary, writes analysis_findings. Read-only on the world (mutates only analysis_*).",
+      "req": "REQ-M5-4: apple-pi analyze exits 0, prints N findings, rows exist.",
+      "verify": "node --test agentdb/analysis/cli.test.js",
+      "commit": "feat(agentdb): apple-pi analyze CLI (M5-4)",
+      "depends_on": [
+        "M5-3"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/analysis/cli.js",
+        "agentdb/analysis/cli.test.js"
+      ]
+    },
+    {
+      "id": "M6-1",
+      "module": "M6",
+      "title": "propose \u2014 findings to proposals",
+      "spec": "analysis/propose.js turns findings into machine-checkable proposals (each: {setting, from, to, rationale, expected_delta}, source_finding_ids). Extends the existing proposals table (+source_finding_ids, +outcome_id). Status proposed.",
+      "req": "REQ-M6-1: a finding of a given kind yields a well-formed proposal citing its finding ids.",
+      "verify": "node --test agentdb/analysis/propose.test.js",
+      "commit": "feat(agentdb): propose \u2014 findings to proposals (M6-1)",
+      "depends_on": [
+        "M5-4"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/analysis/propose.js",
+        "agentdb/analysis/propose.test.js"
+      ]
+    },
+    {
+      "id": "M6-2",
+      "module": "M6",
+      "title": "review (human gate, read-only)",
+      "spec": "apple-pi review [--latest] \u2014 lists proposals + diffs, reads nothing else, writes nothing. (Mirrors existing autoresearch review.)",
+      "req": "REQ-M6-2: shows pending proposals with their source findings; no mutation.",
+      "verify": "node --test agentdb/analysis/review.test.js",
+      "commit": "feat(agentdb): apple-pi review \u2014 human gate (M6-2)",
+      "depends_on": [
+        "M6-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/analysis/review.js",
+        "agentdb/analysis/review.test.js"
+      ]
+    },
+    {
+      "id": "M6-3",
+      "module": "M6",
+      "title": "apply (gated, audited) (red-blue)",
+      "spec": "apple-pi apply --latest --yes applies approved proposals: writes audit (what actually changed), snapshots 'before' metric, flips status applied. --yes required (D9). Never auto-applies.",
+      "req": "REQ-M6-3: without --yes -> no-op + notice; with --yes -> changes applied + audit + before-snapshot recorded.",
+      "verify": "node --test agentdb/analysis/apply.test.js",
+      "commit": "feat(agentdb): apple-pi apply \u2014 gated + audited (M6-3)",
+      "depends_on": [
+        "M6-2"
+      ],
+      "needs_review": true,
+      "files": [
+        "agentdb/analysis/apply.js",
+        "agentdb/analysis/apply.test.js"
+      ]
+    },
+    {
+      "id": "M6-4",
+      "module": "M6",
+      "title": "measure \u2014 outcome recording (closes the loop)",
+      "spec": "analysis/measure.js for applied proposals past a window: compare before vs after metric -> improvement_outcomes (improved|neutral|regressed). Regressed -> next analyze can propose a revert.",
+      "req": "REQ-M6-4: a seeded before/after yields the right verdict + delta.",
+      "verify": "node --test agentdb/analysis/measure.test.js",
+      "commit": "feat(agentdb): measure \u2014 closes the improvement loop (M6-4)",
+      "depends_on": [
+        "M6-3"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/analysis/measure.js",
+        "agentdb/analysis/measure.test.js"
+      ]
+    },
+    {
+      "id": "M6-5",
+      "module": "M6",
+      "title": "launchd schedule for the autonomous loop",
+      "spec": "apple-pi schedule (extend existing) wires a periodic analyze + measure job (e.g. daily). Propose/apply stay manual/gated.",
+      "req": "REQ-M6-5: schedule install creates the LaunchAgent; analyze runs unattended; no apply ever fires from the schedule.",
+      "verify": "node --test agentdb/analysis/schedule.test.js",
+      "commit": "feat(agentdb): scheduled autonomous analyze+measure (M6-5)",
+      "depends_on": [
+        "M6-4"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/analysis/schedule.js",
+        "agentdb/analysis/schedule.test.js"
+      ]
+    },
+    {
+      "id": "M7-1",
+      "module": "M7",
+      "title": "chokidar watch both roots, debounced",
+      "spec": "agentdb/watch.js watches ~/Projects/*/.kanban/ (-> kb reindex) AND ~/.pi/sessions/ (-> session ingest), debounce 150 ms, macOS fsevents.",
+      "req": "REQ-M7-1: editing a card updates kb_* within ~300 ms; a new session line ingests within ~300 ms.",
+      "verify": "node --test agentdb/watch/integration.test.js",
+      "commit": "feat(agentdb): chokidar watcher \u2014 kb + sessions (M7-1)",
+      "depends_on": [
+        "M2-5",
+        "M4-2"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/watch.js",
+        "agentdb/watch/integration.test.js"
+      ]
+    },
+    {
+      "id": "M7-2",
+      "module": "M7",
+      "title": "Single-instance + resilience",
+      "spec": "Pidfile guard (one watcher); on parse failure of a partial write, skip + retry next tick; one bad card never stalls the watcher.",
+      "req": "REQ-M7-2: second start exits cleanly ('already running'); truncated save is skipped, watcher survives.",
+      "verify": "node --test agentdb/watch/resilience.test.js",
+      "commit": "feat(agentdb): watcher single-instance + resilience (M7-2)",
+      "depends_on": [
+        "M7-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/watch/resilience.test.js"
+      ]
+    },
+    {
+      "id": "M7-3",
+      "module": "M7",
+      "title": "launchd LaunchAgent + lazy reconcile",
+      "spec": "apple-pi kanban watch daemon via LaunchAgent (D4); AND every query path calls ensureCurrent()/resume-ingest so it's correct with no daemon. Start/stop clean, no orphans.",
+      "req": "REQ-M7-3: daemon down + edit a card -> next query still sees the change (lazy reconcile). start->stop leaves no orphan.",
+      "verify": "node --test agentdb/watch/launchd.test.js",
+      "commit": "feat(agentdb): watcher LaunchAgent + lazy reconcile (M7-3)",
+      "depends_on": [
+        "M7-2"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/watch/launchd.js",
+        "agentdb/watch/launchd.test.js"
+      ]
+    },
+    {
+      "id": "M8-1",
+      "module": "M8",
+      "title": "apple-pi kanban index [--rebuild]",
+      "spec": "bin/apple-pi kanban index --rebuild drops kb_* first, then reindexes. Without --rebuild, calls ensureCurrent.",
+      "req": "REQ-M8-1: exit 0 + row count; --rebuild drops kb_* first.",
+      "verify": "node --test bin/apple-pi.kanban.index.test.js",
+      "commit": "feat(kanban): CLI kanban index (M8-1)",
+      "depends_on": [
+        "M2-5",
+        "M2-4"
+      ],
+      "needs_review": false,
+      "files": [
+        "bin/apple-pi.kanban.index.js",
+        "bin/apple-pi.kanban.index.test.js"
+      ]
+    },
+    {
+      "id": "M8-2",
+      "module": "M8",
+      "title": "apple-pi kanban list/show/next/graph",
+      "spec": "CLI wrappers around M3-1 (list), M3-1 single-card (show), M3-2 (next = WIP-aware ready, graph = ready + deps).",
+      "req": "REQ-M8-2: filters; next is WIP-aware (M0-2) + ready (M3-2).",
+      "verify": "node --test bin/apple-pi.kanban.list.test.js",
+      "commit": "feat(kanban): CLI kanban list/show/next/graph (M8-2)",
+      "depends_on": [
+        "M8-1",
+        "M3-2"
+      ],
+      "needs_review": false,
+      "files": [
+        "bin/apple-pi.kanban.list.js",
+        "bin/apple-pi.kanban.list.test.js"
+      ]
+    },
+    {
+      "id": "M8-3",
+      "module": "M8",
+      "title": "apple-pi kanban new/move (truth writers)",
+      "spec": "CLI wrappers around M2-5 createCard/moveStatus. Path safety + transition rules enforced (red-blue).",
+      "req": "REQ-M8-3: new -> validate -> show; move diff = 2 lines.",
+      "verify": "node --test bin/apple-pi.kanban.write.test.js",
+      "commit": "feat(kanban): CLI kanban new/move \u2014 truth writers (M8-3)",
+      "depends_on": [
+        "M8-2",
+        "M2-5"
+      ],
+      "needs_review": true,
+      "files": [
+        "bin/apple-pi.kanban.write.js",
+        "bin/apple-pi.kanban.write.test.js"
+      ]
+    },
+    {
+      "id": "M8-4",
+      "module": "M8",
+      "title": "apple-pi db ingest/status/query",
+      "spec": "CLI wrappers: ingest (M4-2), status (counts), query (parameterized filter over sess_*/analysis_*).",
+      "req": "REQ-M8-4: ingest resumes append-only; status shows session/event counts.",
+      "verify": "node --test bin/apple-pi.db.test.js",
+      "commit": "feat(agentdb): CLI db ingest/status/query (M8-4)",
+      "depends_on": [
+        "M8-1",
+        "M4-3"
+      ],
+      "needs_review": false,
+      "files": [
+        "bin/apple-pi.db.js",
+        "bin/apple-pi.db.test.js"
+      ]
+    },
+    {
+      "id": "M8-5",
+      "module": "M8",
+      "title": "apple-pi kanban validate [--project]",
+      "spec": "CLI wrapper around validate.js. Exit 1 + report on invalid; clean -> 0.",
+      "req": "REQ-M8-5: exit 1 + report on invalid; clean -> 0.",
+      "verify": "node --test bin/apple-pi.kanban.validate.test.js",
+      "commit": "feat(kanban): CLI kanban validate (M8-5)",
+      "depends_on": [
+        "M8-2"
+      ],
+      "needs_review": false,
+      "files": [
+        "bin/apple-pi.kanban.validate.js",
+        "bin/apple-pi.kanban.validate.test.js"
+      ]
+    },
+    {
+      "id": "M8-6",
+      "module": "M8",
+      "title": "apple-pi improve (propose, gated)",
+      "spec": "CLI wrapper around propose + apply (M6-1, M6-3). No apply without --yes.",
+      "req": "REQ-M8-6: propose writes proposals; no apply without --yes.",
+      "verify": "node --test bin/apple-pi.improve.test.js",
+      "commit": "feat(agentdb): CLI improve \u2014 propose, gated apply (M8-6)",
+      "depends_on": [
+        "M8-4",
+        "M6-3"
+      ],
+      "needs_review": true,
+      "files": [
+        "bin/apple-pi.improve.js",
+        "bin/apple-pi.improve.test.js"
+      ]
+    },
+    {
+      "id": "M8-7",
+      "module": "M8",
+      "title": "apple-pi measure",
+      "spec": "CLI wrapper around M6-4 measure.js.",
+      "req": "REQ-M8-7: records outcomes for applied proposals past window.",
+      "verify": "node --test bin/apple-pi.measure.test.js",
+      "commit": "feat(agentdb): CLI measure (M8-7)",
+      "depends_on": [
+        "M8-6",
+        "M6-4"
+      ],
+      "needs_review": false,
+      "files": [
+        "bin/apple-pi.measure.js",
+        "bin/apple-pi.measure.test.js"
+      ]
+    },
+    {
+      "id": "M8-8",
+      "module": "M8",
+      "title": "apple-pi db prune --before",
+      "spec": "CLI wrapper around M4-4 prune.",
+      "req": "REQ-M8-8: dry vs yes; kb_*/analysis_* untouched.",
+      "verify": "node --test bin/apple-pi.db.prune.test.js",
+      "commit": "feat(agentdb): CLI db prune (M8-8)",
+      "depends_on": [
+        "M8-4",
+        "M4-4"
+      ],
+      "needs_review": false,
+      "files": [
+        "bin/apple-pi.db.prune.js",
+        "bin/apple-pi.db.prune.test.js"
+      ]
+    },
+    {
+      "id": "M9-1",
+      "module": "M9",
+      "title": "kanban_list / kanban_get",
+      "spec": "Pi agent tools. Reads kb_cards via M3-1 list() + per-card fetch.",
+      "req": "REQ-M9-1: pi harness returns correct JSON from kb_*.",
+      "verify": "node --test agentdb/pi/list.test.js",
+      "commit": "feat(kanban): pi tools kanban_list/get (M9-1)",
+      "depends_on": [
+        "M8-2"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/pi/list.js",
+        "agentdb/pi/list.test.js"
+      ]
+    },
+    {
+      "id": "M9-2",
+      "module": "M9",
+      "title": "kanban_create / kanban_move (truth writers)",
+      "spec": "Pi agent tools. Wrap M2-5 with harness-friendly error surface.",
+      "req": "REQ-M9-2: same path-safety as M2-5; file created + reindexed.",
+      "verify": "node --test agentdb/pi/write.test.js",
+      "commit": "feat(kanban): pi tools kanban_create/move (M9-2)",
+      "depends_on": [
+        "M9-1",
+        "M2-5"
+      ],
+      "needs_review": true,
+      "files": [
+        "agentdb/pi/write.js",
+        "agentdb/pi/write.test.js"
+      ]
+    },
+    {
+      "id": "M9-3",
+      "module": "M9",
+      "title": "kanban_next / kanban_graph",
+      "spec": "Pi agent tools. next = WIP-aware ready; graph = ready + blockedBy.",
+      "req": "REQ-M9-3: next is WIP+ready-aware.",
+      "verify": "node --test agentdb/pi/next.test.js",
+      "commit": "feat(kanban): pi tools kanban_next/graph (M9-3)",
+      "depends_on": [
+        "M9-1",
+        "M3-2"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/pi/next.js",
+        "agentdb/pi/next.test.js"
+      ]
+    },
+    {
+      "id": "M9-4",
+      "module": "M9",
+      "title": "db_query (sessions/events/findings)",
+      "spec": "Pi agent tool. Read-only agent query over sess_*/analysis_* (e.g. 'my last N errors', 'sessions that touched card X'). Parameterized.",
+      "req": "REQ-M9-4: parameterized query; no mutation; returns JSON.",
+      "verify": "node --test agentdb/pi/query.test.js",
+      "commit": "feat(agentdb): pi tool db_query (M9-4)",
+      "depends_on": [
+        "M9-1",
+        "M5-4"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/pi/query.js",
+        "agentdb/pi/query.test.js"
+      ]
+    },
+    {
+      "id": "M9-5",
+      "module": "M9",
+      "title": "self_improve trigger",
+      "spec": "Agent-callable analyze (+ optional propose) within a session. NEVER applies \u2014 apply is CLI-gated only.",
+      "req": "REQ-M9-5: harness runs analyze, returns findings, applies nothing.",
+      "verify": "node --test agentdb/pi/self_improve.test.js",
+      "commit": "feat(agentdb): pi tool self_improve \u2014 analyze only (M9-5)",
+      "depends_on": [
+        "M9-4",
+        "M5-4"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/pi/self_improve.js",
+        "agentdb/pi/self_improve.test.js"
+      ]
+    },
+    {
+      "id": "M9-6",
+      "module": "M9",
+      "title": "Deprecate kanban-bridge.ts",
+      "spec": "Keep one release as a read-only alias to the new tools, then remove.",
+      "req": "REQ-M9-6: alias still answers; deprecation notice logged.",
+      "verify": "node --test agentdb/pi/deprecation.test.js",
+      "commit": "chore(kanban): deprecate kanban-bridge.ts alias (M9-6)",
+      "depends_on": [
+        "M9-1",
+        "M9-2",
+        "M9-3",
+        "M9-4",
+        "M9-5"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/pi/deprecation.test.js"
+      ]
+    },
+    {
+      "id": "M10-1",
+      "module": "M10",
+      "title": "smoke/kanban-*.sh",
+      "spec": "End-to-end shell smokes: index, query, truth writer, disposable db.",
+      "req": "REQ-M10-1: all green in bash smoke/run.sh.",
+      "verify": "bash smoke/run.sh",
+      "commit": "test(kanban): smoke suite (M10-1)",
+      "depends_on": [
+        "M8-5",
+        "M2-5"
+      ],
+      "needs_review": false,
+      "files": [
+        "smoke/kanban-index.sh",
+        "smoke/kanban-query.sh",
+        "smoke/kanban-truth.sh",
+        "smoke/kanban-disposable.sh",
+        "smoke/run.sh"
+      ]
+    },
+    {
+      "id": "M10-2",
+      "module": "M10",
+      "title": "Tier-isolation smoke (headline reliability test)",
+      "spec": "smoke/agentdb-tier-isolation.sh \u2014 seed sess_*+analysis_*, snapshot their row hashes, kanban index --rebuild, assert Tier B byte-identical; then db prune and assert kb_* byte-identical. Proves each tier is disposable independently.",
+      "req": "REQ-M10-2: rebuild leaves Tier B untouched; prune leaves Tier A untouched.",
+      "verify": "bash smoke/agentdb-tier-isolation.sh",
+      "commit": "test(agentdb): tier-isolation smoke \u2014 independent disposability (M10-2)",
+      "depends_on": [
+        "M4-4",
+        "M8-8"
+      ],
+      "needs_review": false,
+      "files": [
+        "smoke/agentdb-tier-isolation.sh"
+      ]
+    },
+    {
+      "id": "M10-3",
+      "module": "M10",
+      "title": "Ingest idempotency + append smoke",
+      "spec": "smoke/agentdb-ingest.sh \u2014 ingest twice -> no dupes; append lines -> only new events.",
+      "req": "REQ-M10-3: ingest twice -> no dupes; append -> only new.",
+      "verify": "bash smoke/agentdb-ingest.sh",
+      "commit": "test(agentdb): ingest idempotency smoke (M10-3)",
+      "depends_on": [
+        "M4-2"
+      ],
+      "needs_review": false,
+      "files": [
+        "smoke/agentdb-ingest.sh"
+      ]
+    },
+    {
+      "id": "M10-4",
+      "module": "M10",
+      "title": "Sanitize + dep-budget",
+      "spec": "Extend smoke/sanitize.sh over agentdb/; assert deps <= chokidar (+ gray-matter only if D3 fallback used). No personal info on the product surface.",
+      "req": "REQ-M10-4: bash smoke/sanitize.sh exit 0.",
+      "verify": "bash smoke/sanitize.sh",
+      "commit": "test(agentdb): sanitize + dep-budget (M10-4)",
+      "depends_on": [
+        "M10-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "smoke/sanitize.sh"
+      ]
+    },
+    {
+      "id": "M11-1",
+      "module": "M11",
+      "title": "Import existing workspace cards (dogfood parity)",
+      "spec": "The real ~/Projects/*/.kanban/cards/*.md already match \u00a75.1 -> apple-pi kanban index. (Drop blocks from any that still store it \u2014 D6; recompute.) Verify parity.",
+      "req": "REQ-M11-1: kb row count == sum of cards/*.card.md.",
+      "verify": "node --test agentdb/migration/import-cards.test.js",
+      "commit": "chore(kanban): import existing workspace cards (M11-1)",
+      "depends_on": [
+        "M10-1"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/migration/import-cards.js",
+        "agentdb/migration/import-cards.test.js"
+      ]
+    },
+    {
+      "id": "M11-2",
+      "module": "M11",
+      "title": "Ingest the 89 existing sessions",
+      "spec": "apple-pi db ingest over ~/.pi/sessions/. Confirm event/session counts; spot-check aggregates vs runs (existing daily table).",
+      "req": "REQ-M11-2: all 89 files ingested; sess_events count plausible vs JSONL line totals.",
+      "verify": "node --test agentdb/migration/ingest-sessions.test.js",
+      "commit": "chore(agentdb): ingest existing sessions (M11-2)",
+      "depends_on": [
+        "M11-1",
+        "M4-3"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/migration/ingest-sessions.test.js"
+      ]
+    },
+    {
+      "id": "M11-3",
+      "module": "M11",
+      "title": "Absorb autoresearch.db -> agent.db",
+      "spec": "agentdb/lib/migrate.js copies runs+proposals from ~/.pi/agent/autoresearch.db into agent.db; points lifecycle/lib/db.js dbPath() at agent.db; keeps a .pre-merge backup of the old db.",
+      "req": "REQ-M11-3: after migrate, apple-pi status reads from agent.db; old rows present; old db backed up.",
+      "verify": "node --test agentdb/migration/autoresearch.test.js",
+      "commit": "chore(agentdb): absorb autoresearch.db into agent.db (M11-3)",
+      "depends_on": [
+        "M11-2"
+      ],
+      "needs_review": false,
+      "files": [
+        "agentdb/lib/migrate.js",
+        "agentdb/migration/autoresearch.test.js"
+      ]
+    },
+    {
+      "id": "M11-4",
+      "module": "M11",
+      "title": "Decommission the-agent kanban (gated, last) (confirm with user first)",
+      "spec": "Stop the kanban-roadmap-sync cron; archive ~//<agent-dir>/kanban/boards/; unset pi KANBAN_DB_PATH (was the the-agent DB); remove kanban-bridge.ts post-deprecation. CONFIRM WITH USER BEFORE DISABLING THE CRON (it feeds the web kanban today).",
+      "req": "REQ-M11-4: new tools the only kanban surface; web kanban either repointed or formally retired.",
+      "verify": "node --test agentdb/migration/decommission.test.js",
+      "commit": "chore(kanban): decommission hermes sync + bridge (M11-4)",
+      "depends_on": [
+        "M11-3",
+        "M9-6"
+      ],
+      "needs_review": true,
+      "files": [
+        "agentdb/migration/decommission.test.js"
+      ]
     }
   ]
 }
