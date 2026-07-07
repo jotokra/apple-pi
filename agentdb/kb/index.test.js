@@ -55,13 +55,13 @@ function makeTree(root, layout) {
 }
 
 // seededDB() — fresh in-memory DB with the kb_* schema applied PLUS a dummy
-// non-kb table (`analysis_runs`, a plausible Tier-B name) seeded with one row.
+// non-kb table (`tier_b_canary`, a plausible Tier-B name) seeded with one row.
 // That table+row is the tier-isolation canary: it must survive a rebuild.
 function seededDB() {
 	const db = new DatabaseSync(":memory:");
 	db.exec(fs.readFileSync(SCHEMA_PATH, "utf8"));
-	db.exec("CREATE TABLE analysis_runs (id INTEGER PRIMARY KEY, note TEXT NOT NULL);");
-	db.exec("INSERT INTO analysis_runs (id, note) VALUES (1, 'durable-tier-b-data');");
+	db.exec("CREATE TABLE tier_b_canary (id INTEGER PRIMARY KEY, note TEXT NOT NULL);");
+	db.exec("INSERT INTO tier_b_canary (id, note) VALUES (1, 'durable-tier-b-data');");
 	return db;
 }
 
@@ -70,8 +70,8 @@ function seededDB() {
 // being added or dropped by the rebuild).
 function snapshot(db) {
 	return {
-		row: db.prepare("SELECT id, note FROM analysis_runs ORDER BY id").all(),
-		sql: db.prepare("SELECT sql FROM sqlite_master WHERE name='analysis_runs'").get().sql,
+		row: db.prepare("SELECT id, note FROM tier_b_canary ORDER BY id").all(),
+		sql: db.prepare("SELECT sql FROM sqlite_master WHERE name='tier_b_canary'").get().sql,
 		tables: db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table','index') ORDER BY name")
 			.all().map(r => r.name),
 	};
@@ -116,7 +116,7 @@ test("rebuild DROPs only kb_* tables; a seeded non-kb table+row survive unchange
 	const after = snapshot(db);
 	assert.deepEqual(after.row, before.row, "non-kb row must survive rebuild unchanged");
 	assert.equal(after.sql, before.sql, "non-kb table DDL must survive rebuild unchanged");
-	assert.ok(after.tables.includes("analysis_runs"), "canary table still present after rebuild");
+	assert.ok(after.tables.includes("tier_b_canary"), "canary table still present after rebuild");
 });
 
 test("rebuild preserves MULTIPLE non-kb tables of differing shapes (tier isolation, multi-canary)", () => {
@@ -125,12 +125,12 @@ test("rebuild preserves MULTIPLE non-kb tables of differing shapes (tier isolati
 	const db = seededDB();
 	db.exec("CREATE TABLE sess_notes (k TEXT PRIMARY KEY, v TEXT);");
 	db.exec(`INSERT INTO sess_notes VALUES ('x', 'y');`);
-	const beforeA = db.prepare("SELECT * FROM analysis_runs").all();
+	const beforeA = db.prepare("SELECT * FROM tier_b_canary").all();
 	const beforeS = db.prepare("SELECT * FROM sess_notes").all();
 
 	rebuild(db, root);
 
-	assert.deepEqual(db.prepare("SELECT * FROM analysis_runs").all(), beforeA);
+	assert.deepEqual(db.prepare("SELECT * FROM tier_b_canary").all(), beforeA);
 	assert.deepEqual(db.prepare("SELECT * FROM sess_notes").all(), beforeS);
 	assert.equal(db.prepare("SELECT count(*) c FROM kb_cards").get().c, 1);
 });
