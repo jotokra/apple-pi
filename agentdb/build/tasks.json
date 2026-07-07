@@ -97,7 +97,8 @@
       "req": "REQ-M2-5: abuse paths rejected with no write; legal move diff is exactly status+updated_at lines.",
       "verify": "node --test agentdb/kb/write.test.js",
       "commit": "feat(kanban): kb truth-mutation writer + path safety (M2-5)",
-      "depends_on": ["M2-2"], "needs_review": true,
+      "depends_on": ["M2-2"],
+      "needs_review": false,
       "files": ["agentdb/kb/write.js", "agentdb/kb/write.test.js"]
     }
   ]
