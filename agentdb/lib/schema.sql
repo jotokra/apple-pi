@@ -103,9 +103,9 @@ CREATE INDEX IF NOT EXISTS idx_sess_files_session ON sess_files(session_id);
 -- {tool_name: call_count} map for the tool_underuse/tool_overuse detector.
 CREATE TABLE IF NOT EXISTS sess_sessions (
   session_id        TEXT    PRIMARY KEY,             -- UUID
-  started_at        TEXT    NOT NULL,                -- ISO8601 of first event
+  started_at        TEXT,                            -- ISO8601 of first event (nullable: empty session has no events)
   ended_at          TEXT,                            -- ISO8601 of last event (NULL if still active)
-  last_event_at     TEXT    NOT NULL,                -- ISO8601 of last event (kept warm by ingest)
+  last_event_at     TEXT,                            -- ISO8601 of last event (kept warm by ingest)
   message_count     INTEGER NOT NULL DEFAULT 0,      -- human + assistant messages only
   tool_call_count   INTEGER NOT NULL DEFAULT 0,      -- total tool invocations
   error_count       INTEGER NOT NULL DEFAULT 0,      -- events with is_error=true
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS sess_events (
   session_id      TEXT    NOT NULL,                   -- FK to sess_sessions.session_id (no formal FK; SQLite)
   seq             INTEGER NOT NULL,                   -- 0-indexed line position in the file
   type            TEXT    NOT NULL,                   -- event type (session, message, model_change, ...)
-  ts              TEXT    NOT NULL,                   -- ISO8601 timestamp from the event
+  ts              TEXT,                               -- ISO8601 timestamp from the event (nullable: forward-compat for unknown types)
   role            TEXT,                               -- user|assistant|tool|system (when applicable)
   tool            TEXT,                               -- tool name (when type is tool_call)
   tokens_in       INTEGER NOT NULL DEFAULT 0,
