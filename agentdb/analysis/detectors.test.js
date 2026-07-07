@@ -276,7 +276,7 @@ test("happy: model_drift is per-model (one model drifting doesn't trigger for ot
 	assert.deepEqual(models, ["MiniMax-M3"], "only the drifting model triggers a finding (<model> stable across baseline + recent)");
 });
 
-test("happy: runAllDetectors returns flat list across all three", () => {
+test("happy: runAllDetectors returns flat list across all detectors", () => {
 	const db = freshDB();
 	// Set up: error_pattern trigger
 	for (let i = 0; i < 6; i++) {
@@ -289,7 +289,7 @@ test("happy: runAllDetectors returns flat list across all three", () => {
 	insertSession(db, { session_id: "s-spike", cost: 1.0, message_count: 5, model: "MiniMax-M3", ended_at: "2026-03-01T00:00:00.000Z" });
 	const res = runAllDetectors(db);
 	assert.ok(res.findings.length >= 2, `expected at least 2 findings, got ${res.findings.length}`);
-	assert.equal(res.detectorCount, 3);
+	assert.equal(res.detectorCount, 6);
 	const detectors = new Set(res.findings.map(f => f.detector));
 	assert.ok(detectors.has("error_pattern"));
 	assert.ok(detectors.has("cost_spike"));
