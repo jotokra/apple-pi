@@ -100,6 +100,33 @@
       "depends_on": ["M2-2"],
       "needs_review": false,
       "files": ["agentdb/kb/write.js", "agentdb/kb/write.test.js"]
+    },
+    {
+      "id": "M3-1", "module": "M3", "title": "Filter queries",
+      "spec": "agentdb/kb/query.js: list({status,project,assignee,tag,priority,parent}) returning card rows from kb_cards. ALL filters parameterized (? placeholders + bound values) — never string-concat user input into SQL (red-blue: SQL injection is the #1 attack surface on a query layer). Unknown filter keys are ignored (forward-compat). Empty filter object = return everything. tag matches ANY-of (card.tags_json contains the tag). priority is exact-match (int). priority may be {min,max} for ranges (AND between min and max). Default ordering: priority DESC NULLS LAST, then id ASC. Write agentdb/kb/query.test.js with abuse cases FIRST: SQL-injection attempts ('1=1; DROP TABLE kb_cards;--', \"' OR '1'='1\") are treated as literal values; user input never reaches the SQL string; non-string values coerced safely; unknown keys ignored without error; no rows leak across projects.",
+      "req": "REQ-M3-1: filters AND-compose correctly; SQL-injection attempts return as literal matches (no exec, no error); range priority works.",
+      "verify": "node --test agentdb/kb/query.test.js",
+      "commit": "feat(kanban): kb filter queries (M3-1)",
+      "depends_on": ["M2-2"], "needs_review": false,
+      "files": ["agentdb/kb/query.js", "agentdb/kb/query.test.js"]
+    },
+    {
+      "id": "M3-2", "module": "M3", "title": "Dependency graph + ready() + cycle detect",
+      "spec": "agentdb/kb/graph.js: (1) edges(db) -> [{from,to}] from kb_deps; (2) ready(db) -> ids whose status is 'todo' AND all depends_on ids are 'done' (or absent); (3) detectCycles(db) -> string[] of cycle-paths (e.g. ['A','B','C','A']) — REPORT, never throw (a corrupt kb shouldn't crash the caller); (4) blockedBy(id, db) -> ids that block this card (reverse edge lookup via idx_kb_deps_to); (5) blocks(id, db) -> ids this card blocks (forward edges). Pure functions, no I/O outside the db argument. Write agentdb/kb/graph.test.js covering: a simple chain (A→B→C), a parallel diamond, a self-loop (cycle: A→A), a 3-cycle (A→B→C→A), an unreachable card, a card with no depends_on (always ready if status=todo), ready() excludes blocked cards, ready() excludes in_progress cards (only todo status qualifies).",
+      "req": "REQ-M3-2: ready() returns only todo cards whose deps are all done; detectCycles returns paths not throws; blockedBy/blocks round-trip via kb_deps.",
+      "verify": "node --test agentdb/kb/graph.test.js",
+      "commit": "feat(kanban): kb dep graph + ready() + cycles (M3-2)",
+      "depends_on": ["M3-1"], "needs_review": false,
+      "files": ["agentdb/kb/graph.js", "agentdb/kb/graph.test.js"]
+    },
+    {
+      "id": "M3-3", "module": "M3", "title": "FTS5 search",
+      "spec": "agentdb/kb/search.js: search(q, db, opts={limit=10}) -> [{id, title, snippet, rank}] from kb_body_fts. Use FTS5 bm25() ranking (lower = better; negate for sort-asc). snippet(title,body,'<mark>','</mark>','…',8) for the highlighted hit context. q is the user query — sanitize for FTS5 syntax (escape double-quotes by doubling; quote-wrap if it contains FTS5 operators). Pure function; no side effects. Write agentdb/kb/search.test.js with: a body term ranks its card first (the card containing the literal term beats a card that mentions it only in tags); absent term returns []; FTS5 syntax chars in q are escaped (no syntax error); limit caps the result count; empty q returns [].",
+      "req": "REQ-M3-3: a body term ranks its card first; absent term → empty; FTS5 syntax chars in q do not raise.",
+      "verify": "node --test agentdb/kb/search.test.js",
+      "commit": "feat(kanban): kb FTS5 search (M3-3)",
+      "depends_on": ["M2-2"], "needs_review": false,
+      "files": ["agentdb/kb/search.js", "agentdb/kb/search.test.js"]
     }
   ]
 }
