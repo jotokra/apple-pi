@@ -87,7 +87,8 @@ CREATE TABLE IF NOT EXISTS kb_meta (
 CREATE TABLE IF NOT EXISTS sess_files (
   file_path        TEXT    PRIMARY KEY,              -- absolute path to the JSONL session file
   session_id      TEXT    NOT NULL,                  -- the session_id embedded in the file (UUID)
-  file_hash       TEXT    NOT NULL,                  -- content hash of the WHOLE file at ingest time
+  file_hash       TEXT    NOT NULL,                  -- content hash of the WHOLE file at last ingest
+  prefix_hash     TEXT    NOT NULL DEFAULT '',       -- content hash of lines [0..ingested_lines) at last ingest
   total_lines     INTEGER NOT NULL DEFAULT 0,        -- current line count of the file
   ingested_lines  INTEGER NOT NULL DEFAULT 0,        -- how many lines we've ingested so far
   ingested_at     TEXT    NOT NULL,                  -- ISO8601 of last successful ingest
