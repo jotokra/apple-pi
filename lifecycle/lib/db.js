@@ -1,25 +1,42 @@
 // lifecycle/lib/db.js — shared SQLite helpers for the autoresearch lifecycle.
 // Uses node:sqlite (Node 22, same dep as the kanban-bridge extension).
 // Callers should run via `node --no-warnings` to suppress the ExperimentalWarning.
+//
+// M11-3 repoint: the lifecycle now reads+writes the UNIFIED ~/.pi/agent/agent.db
+// (same file as agentdb/lib/db.js), NOT the legacy autoresearch.db. dbPath()
+// therefore mirrors agentdb.dbPath() (AGENT_DB || piDir/agent/agent.db). The
+// legacy ~/.pi/agent/autoresearch.db survives only as the one-shot SOURCE for
+// agentdb/lib/migrate.js (absorbAutoresearch); its resolver lives there now.
+//
+// open() applies the UNIFIED agentdb/lib/schema.sql (the single schema source
+// for agent.db) so the lifecycle can never create a stale/wrong-shape table on
+// a fresh agent.db. lifecycle/schema.sql is retained as the verbatim shape
+// reference for the legacy tables + the migrate source-fixture builder in tests.
 
 "use strict";
 const { readFileSync } = require("node:fs");
 const { DatabaseSync } = require("node:sqlite");
+const path = require("node:path");
 
-const SCHEMA_PATH = require("path").join(__dirname, "..", "schema.sql");
+// UNIFIED schema: same file agentdb/lib/db.js applies. Keeping one schema
+// source for agent.db prevents the two libraries from diverging on table shape.
+const SCHEMA_PATH = path.join(__dirname, "..", "..", "agentdb", "lib", "schema.sql");
 
 function piDir() {
 	return process.env.PI_CODING_AGENT_DIR || `${process.env.HOME}/.pi`;
 }
+// dbPath() — the unified agent DB (M11-3: was autoresearch.db, now agent.db).
+// Mirrors agentdb/lib/db.js so the lifecycle and the kanban/ingest/analysis
+// layers share ONE file. $AGENT_DB override for tests / rebuilds.
 function dbPath() {
-	return process.env.AUTORESEARCH_DB || `${piDir()}/agent/autoresearch.db`;
+	return process.env.AGENT_DB || `${piDir()}/agent/agent.db`;
 }
 
-// open() — open + ensure schema. mode: 'rw' (default) | 'ro'.
+// open() — open + ensure the unified schema. mode: 'rw' (default) | 'ro'.
 function open(mode = "rw") {
-	const path = dbPath();
+	const file = dbPath();
 	const opts = mode === "ro" ? { readOnly: true } : {};
-	const db = new DatabaseSync(path, opts);
+	const db = new DatabaseSync(file, opts);
 	db.exec(readFileSync(SCHEMA_PATH, "utf8"));
 	return db;
 }

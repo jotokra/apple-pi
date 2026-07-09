@@ -210,3 +210,60 @@ CREATE TABLE IF NOT EXISTS improvement_outcomes (
   notes           TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_improvement_outcomes_proposal ON improvement_outcomes(proposal_id);
+
+-- ===== M11-3 — legacy autoresearch.db tables absorbed verbatim =====
+--
+-- Added by M11-3 (lib/migrate.js copies these from ~/.pi/agent/autoresearch.db
+-- into agent.db on the one-shot absorb, then lifecycle/lib/db.js is repointed
+-- here so collect-metrics.js keeps writing `runs` into the unified DB). Both
+-- tables are byte-identical to the autoresearch originals (lifecycle/schema.sql)
+-- so the copy is a straight INSERT ... SELECT. CREATE ... IF NOT EXISTS keeps
+-- open() idempotent.
+
+-- `runs` — the existing daily-collection table from autoresearch.db
+-- (SUPERPROMPT §5.2: "runs — existing daily-collection table, unchanged
+-- (M11 migrates it in)"). No collision: Tier B had no `runs` before M11-3.
+-- `apple-pi status` + collect-metrics.js read/write this after the repoint.
+CREATE TABLE IF NOT EXISTS runs (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_date         TEXT    NOT NULL UNIQUE,   -- YYYY-MM-DD (the day covered)
+  collected_at     TEXT    NOT NULL,          -- ISO timestamp of this collection
+  session_count    INTEGER NOT NULL,          -- distinct session files seen
+  total_turns      INTEGER NOT NULL,          -- user + assistant + toolResult messages
+  tokens_in        INTEGER NOT NULL,
+  tokens_out       INTEGER NOT NULL,
+  cache_read       INTEGER NOT NULL,
+  cache_write      INTEGER NOT NULL,
+  cost             REAL    NOT NULL,          -- total $ across the day's assistant turns
+  compaction_count INTEGER NOT NULL DEFAULT 0,
+  error_count      INTEGER NOT NULL,          -- toolResult messages with isError=true
+  tool_calls_json  TEXT    NOT NULL,          -- {"bash":N,"read":N,...}
+  models_json      TEXT    NOT NULL           -- {"<model>":N_turns,...}
+);
+CREATE INDEX IF NOT EXISTS idx_runs_date ON runs(run_date);
+
+-- `legacy_proposals` — the autoresearch.db weekly-brief proposals, absorbed
+-- verbatim. DISTINCT NAME on purpose: agent.db's `proposals` (above, M6-1) is
+-- the NEW self-improvement setting-change proposals (setting/from_value/
+-- to_value/rationale/...), actively written by `apple-pi improve` and tested
+-- by bin/apple-pi.improve.test.js. The autoresearch `proposals` is a DIFFERENT
+-- concept (the weekly brief: week_start/week_end/brief_path/summary/
+-- changes_json) with an incompatible column set, so merging into the M6
+-- `proposals` would either lose data or break improve. SUPERPROMPT §5.2
+-- intended `proposals` to extend the autoresearch shape, but the M6 impl
+-- diverged; M11-3 must not clobber the active M6 table, so the legacy rows
+-- land here under an auditable name. Reshaping/merging the two concepts is an
+-- M11-4+ concern, not this atomic migration.
+CREATE TABLE IF NOT EXISTS legacy_proposals (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at   TEXT    NOT NULL,
+  week_start   TEXT    NOT NULL,              -- YYYY-MM-DD (Mon)
+  week_end     TEXT    NOT NULL,              -- YYYY-MM-DD (Sun)
+  brief_path   TEXT    NOT NULL,              -- path to the markdown brief
+  summary      TEXT    NOT NULL,              -- one-line summary
+  changes_json TEXT    NOT NULL,              -- [{setting,from,to,rationale}, ...]
+  status       TEXT    NOT NULL DEFAULT 'proposed',  -- proposed|approved|applied|rejected|superseded
+  applied_at   TEXT,
+  audit        TEXT                           -- filled at apply time
+);
+CREATE INDEX IF NOT EXISTS idx_legacy_proposals_status ON legacy_proposals(status);
