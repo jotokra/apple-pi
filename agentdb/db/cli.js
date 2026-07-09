@@ -33,6 +33,7 @@ const path = require("node:path");
 const { open, piDir } = require("../lib/db");
 const { ingestFile } = require("../ingest/incremental");
 const { recompute } = require("../ingest/aggregates");
+const { prune } = require("../ingest/prune");
 
 // --- flag parsing --------------------------------------------------------
 // Minimal parser matching agentdb/cli.js's shape: value flags consume the
@@ -41,8 +42,9 @@ const { recompute } = require("../ingest/aggregates");
 const VALUE_FLAGS = new Set([
 	"--session", "--type", "--tool", "--role", "--model",
 	"--severity", "--detector", "--run", "--limit",
+	"--before",
 ]);
-const BOOL_FLAGS = new Set(["--json", "--errors"]);
+const BOOL_FLAGS = new Set(["--json", "--errors", "--yes", "--dry"]);
 
 function parseOpts(args) {
 	const out = { values: {}, bools: {}, positionals: [] };
@@ -342,6 +344,64 @@ function queryCmd(args) {
 	return 0;
 }
 
+// --- prune --------------------------------------------------------------
+
+// pruneCmd(args) -> exit code. Wraps M4-4's prune (agentdb/ingest/prune.js):
+// dry-run (default) counts the rows older than --before; --yes actually
+// deletes them, scoped to sess_events/sess_sessions/sess_files ONLY.
+// kb_* (Tier A) + analysis_*/proposals (analysis tier) are NEVER touched —
+// the tier-isolation invariant is owned by prune()'s PRUNE_TABLES whitelist.
+// Every prune (dry or yes) is logged to analysis_runs.notes (audit trail).
+//
+// RED-BLUE: --before is required + validated by prune()/parseDate (bad date
+// → ok:false, no mutation). dry is the DEFAULT (--dry is an explicit no-op
+// marker); --yes is the sole gate to mutate. The CLI never lets the caller
+// steer which tables are pruned — the whitelist is fixed in the primitive.
+function pruneCmd(args) {
+	const opts = parseOpts(args);
+	const json = !!opts.bools["--json"];
+	const yes = !!opts.bools["--yes"];
+	const dry = !yes; // --dry is accepted as an explicit marker; default is dry
+	const before = opts.values["--before"];
+
+	if (before === undefined) {
+		console.error("apple-pi db prune: --before <YYYY-MM-DD|ISO8601> is required (try 'apple-pi db help')");
+		return 2;
+	}
+
+	const db = open();
+	let res;
+	try {
+		res = prune({ db, before, dry });
+	} finally {
+		db.close();
+	}
+
+	if (!res.ok) {
+		for (const e of (res.errors || ["prune: failed"])) console.error(`apple-pi db ${e}`);
+		return 1;
+	}
+
+	if (json) {
+		const out = { ok: true, dry: res.dry, before: res.before };
+		if (res.dry) out.counts = res.counts;
+		else out.deleted = res.deleted;
+		process.stdout.write(JSON.stringify(out, null, 2) + "\n");
+		return 0;
+	}
+
+	const c = res.dry ? res.counts : res.deleted;
+	const suffix = res.dry ? "" : " deleted";
+	console.log("apple-pi db prune");
+	console.log(`  before   : ${res.before}`);
+	console.log(`  mode     : ${res.dry ? "dry-run (no rows deleted; pass --yes to delete)" : "yes (rows DELETED)"}`);
+	console.log(`  events   : ${c.sess_events}${suffix}`);
+	console.log(`  sessions : ${c.sess_sessions}${suffix}`);
+	console.log(`  files    : ${c.sess_files}${suffix}`);
+	console.log(`  audit    : logged to analysis_runs.notes`);
+	return 0;
+}
+
 // --- dispatch ------------------------------------------------------------
 
 function help() {
@@ -361,6 +421,14 @@ function help() {
         findings filters: --severity S --detector D --run N
         all tables:       --limit N (default 1000; 0 = unlimited)
 
+  prune --before <date> [--yes] [--dry] [--json]   opt-in retention (M4-4)
+        <date>  YYYY-MM-DD or ISO8601; rows older than this are eligible
+        (default)  DRY-RUN: report the counts, write nothing
+        --yes      actually delete sess_events/sess_sessions/sess_files
+        --dry      explicit dry-run marker (default is already dry)
+        scoped to sess_* ONLY — kb_* (Tier A) + analysis_*/proposals are
+        NEVER pruned; every run is logged to analysis_runs.notes
+
   DB path is $AGENT_DB, else ~/.pi/agent/agent.db.
   ingest writes sess_* only (Tier B); it never touches kb_* (Tier A).`);
 }
@@ -379,10 +447,12 @@ function run(args) {
 			return statusCmd(rest);
 		case "query":
 			return queryCmd(rest);
+		case "prune":
+			return pruneCmd(rest);
 		default:
 			console.error(`apple-pi db: unknown subcommand '${sub}' (try 'apple-pi db help')`);
 			return 2;
 	}
 }
 
-module.exports = { run, ingestCmd, statusCmd, queryCmd, help, parseOpts, resolveIngestFiles };
+module.exports = { run, ingestCmd, statusCmd, queryCmd, pruneCmd, help, parseOpts, resolveIngestFiles };
