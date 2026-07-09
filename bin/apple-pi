@@ -112,6 +112,7 @@ function help() {
   db ingest|status|query        durable Tier-B: append-only ingest, counts,
                                  parameterized filter over sess_*/analysis_*
   analyze                       run all detectors, print findings, write analysis_*
+  improve [--apply] [--yes]     propose findings→proposals; --apply applies the latest (--yes to write)
   update [--check]              release check: local vs GitHub releases (read-only)
   update --all --yes            apply: pi update --all + pull apple-pi + sync pivoice
   update --voice --yes          apply: re-sync just the pivoice bundle from upstream
@@ -163,6 +164,12 @@ function main() {
 			// only; never mutates sess_*/kb_*/the world).
 			const analyzeCli = require(path.join(REPO, "agentdb", "analysis", "cli.js"));
 			return analyzeCli.run(rest);
+		}
+		case "improve": {
+			// propose + apply wrapper — delegates to agentdb/analysis/improve.js
+			// (M6-1 propose always; M6-3 apply only with --apply, gated by --yes).
+			const improveCli = require(path.join(REPO, "agentdb", "analysis", "improve.js"));
+			return improveCli.run(rest);
 		}
 		case "db": {
 			// durable Tier-B CLI — delegates to agentdb/db/cli.js
