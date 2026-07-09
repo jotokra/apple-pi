@@ -263,9 +263,9 @@ test("happy: model_drift is per-model (one model drifting doesn't trigger for ot
 	for (let i = 0; i < 30; i++) {
 		insertSession(db, { session_id: `mm-base-${i}`, cost: 0.01, message_count: 10, model: "MiniMax-M3", ended_at: mkDate(i) });
 	}
-	// Baseline 10 sessions of <model> (days 30-39)
+	// Baseline 10 sessions of glm-5.1 (days 30-39)
 	for (let i = 30; i < 40; i++) {
-		insertSession(db, { session_id: `glm-base-${i}`, cost: 0.005, message_count: 10, model: "<model>", ended_at: mkDate(i) });
+		insertSession(db, { session_id: `glm-base-${i}`, cost: 0.005, message_count: 10, model: "glm-5.1", ended_at: mkDate(i) });
 	}
 	// Recent: MiniMax-M3 drifts (days 40-49, cost goes up 5x)
 	for (let i = 40; i < 50; i++) {
@@ -273,7 +273,7 @@ test("happy: model_drift is per-model (one model drifting doesn't trigger for ot
 	}
 	const findings = detectModelDrift(db);
 	const models = findings.map(f => f.evidence.model);
-	assert.deepEqual(models, ["MiniMax-M3"], "only the drifting model triggers a finding (<model> stable across baseline + recent)");
+	assert.deepEqual(models, ["MiniMax-M3"], "only the drifting model triggers a finding (glm-5.1 stable across baseline + recent)");
 });
 
 test("happy: runAllDetectors returns flat list across all detectors", () => {

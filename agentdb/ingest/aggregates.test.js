@@ -95,7 +95,7 @@ test("abuse: loadPricing merges overrides over defaults", () => {
 	const pricing = loadPricing({ pricingOverride: { "MiniMax-M3": { input: 0.001, output: 0.003 } } });
 	assert.equal(pricing["MiniMax-M3"].input, 0.001, "override wins");
 	assert.equal(pricing["MiniMax-M3"].output, 0.003, "override wins");
-	assert.ok(pricing["<model>"], "other models keep their defaults");
+	assert.ok(pricing["glm-5.1"], "other models keep their defaults");
 });
 
 // =====================================================================
@@ -106,13 +106,13 @@ test("happy: costFor computes (tokens/1000) * rate for known models", () => {
 	const pricing = loadPricing();
 	// MiniMax-M3: 0.0008/0.0024 per 1k -> 1000 input + 1000 output = $0.0008 + $0.0024 = $0.0032
 	assert.equal(costFor("MiniMax-M3", 1000, 1000, pricing), 0.0032);
-	// <model>: 0.0006/0.0022 per 1k -> 5000 input + 500 output = $0.003 + $0.0011 = $0.0041
-	assert.equal(costFor("<model>", 5000, 500, pricing), 0.0041);
+	// glm-5.1: 0.0006/0.0022 per 1k -> 5000 input + 500 output = $0.003 + $0.0011 = $0.0041
+	assert.equal(costFor("glm-5.1", 5000, 500, pricing), 0.0041);
 });
 
 test("happy: a session with 2 user + 2 assistant + 1 tool message rolls up correctly", () => {
 	const db = freshDB();
-	insertEvent(db, { session_id: "s-A", seq: 0, type: "session", ts: "2026-01-01T00:00:00.000Z", event_json: JSON.stringify({ type: "session", id: "s-A", cwd: "/Users/<user>/Projects" }) });
+	insertEvent(db, { session_id: "s-A", seq: 0, type: "session", ts: "2026-01-01T00:00:00.000Z", event_json: JSON.stringify({ type: "session", id: "s-A", cwd: "/proj" }) });
 	insertEvent(db, { session_id: "s-A", seq: 1, type: "model_change", ts: "2026-01-01T00:00:01.000Z", event_json: JSON.stringify({ type: "model_change", id: "MiniMax-M3" }) });
 	insertEvent(db, { session_id: "s-A", seq: 2, type: "message", role: "user",      ts: "2026-01-01T00:00:02.000Z", tokens_in: 100, tokens_out: 0 });
 	insertEvent(db, { session_id: "s-A", seq: 3, type: "message", role: "assistant", ts: "2026-01-01T00:00:03.000Z", tokens_in: 0, tokens_out: 200 });
@@ -129,7 +129,7 @@ test("happy: a session with 2 user + 2 assistant + 1 tool message rolls up corre
 	assert.equal(r.tokens_in, 100 + 50 + 80, "100+50+80 = 230 (assistant tokens_in=0 don't add)");
 	assert.equal(r.tokens_out, 200 + 150, "200+150 = 350 (user/tool tokens_out=0 don't add)");
 	assert.equal(r.model, "MiniMax-M3", "last model_change wins");
-	assert.equal(r.cwd, "/Users/<user>/Projects", "first session event's cwd");
+	assert.equal(r.cwd, "/proj", "first session event's cwd");
 	assert.equal(r.started_at, "2026-01-01T00:00:00.000Z");
 	assert.equal(r.ended_at, "2026-01-01T00:00:06.000Z");
 	assert.equal(r.last_event_at, "2026-01-01T00:00:06.000Z");
@@ -213,7 +213,7 @@ test("happy: last model_change wins (most-recent wins)", () => {
 	const db = freshDB();
 	insertEvent(db, { session_id: "s-A", seq: 0, type: "session", event_json: "{}" });
 	insertEvent(db, { session_id: "s-A", seq: 1, type: "model_change", event_json: JSON.stringify({ id: "MiniMax-M3" }) });
-	insertEvent(db, { session_id: "s-A", seq: 2, type: "model_change", event_json: JSON.stringify({ id: "<model>" }) });
+	insertEvent(db, { session_id: "s-A", seq: 2, type: "model_change", event_json: JSON.stringify({ id: "glm-5.1" }) });
 	insertEvent(db, { session_id: "s-A", seq: 3, type: "model_change", event_json: JSON.stringify({ id: "claude-sonnet-4" }) });
 	const res = computeRollup(db, "s-A");
 	assert.equal(res.rollup.model, "claude-sonnet-4");

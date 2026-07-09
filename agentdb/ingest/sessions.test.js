@@ -126,7 +126,7 @@ test("happy: session event exposes session_id from .id", () => {
 		type: "session",
 		id: "abc-123-uuid",
 		timestamp: "2026-01-01T00:00:00.000Z",
-		cwd: "/Users/<user>/Projects",
+		cwd: "/proj",
 	}), 0);
 	assert.equal(res.ok, true);
 	assert.equal(res.row.session_id, "abc-123-uuid");

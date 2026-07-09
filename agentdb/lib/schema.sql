@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS sess_sessions (
   tokens_in         INTEGER NOT NULL DEFAULT 0,      -- sum of input tokens
   tokens_out        INTEGER NOT NULL DEFAULT 0,      -- sum of output tokens
   cost              REAL    NOT NULL DEFAULT 0,      -- estimated cost in USD (model-priced)
-  model             TEXT,                            -- last model seen (e.g. MiniMax-M3, <model>)
+  model             TEXT,                            -- last model seen (e.g. MiniMax-M3, claude-sonnet-4)
   cwd               TEXT,                            -- working directory from session_meta
   tool_calls_json   TEXT    NOT NULL DEFAULT '{}',   -- JSON {tool_name: count}
   file_path         TEXT                             -- back-ref to sess_files.file_path (for pruning)

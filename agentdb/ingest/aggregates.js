@@ -35,7 +35,6 @@ const DEFAULT_PRICING = {
 	"MiniMax-M3":         { input: 0.0008, output: 0.0024 }, // ~$0.80/$2.40 per 1M
 	"MiniMax-M2.7":       { input: 0.0004, output: 0.0012 },
 	"MiniMax-M2.7-highspeed": { input: 0.0008, output: 0.0024 },
-	"<model>":            { input: 0.0006, output: 0.0022 }, // z.ai
 	"glm-5.1":            { input: 0.0006, output: 0.0022 },
 	"glm-5-turbo":        { input: 0.0003, output: 0.0009 },
 	"glm-4.7":            { input: 0.0003, output: 0.0009 },

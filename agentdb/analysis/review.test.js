@@ -157,7 +157,7 @@ test("happy: --latest returns only the single newest pending proposal", () => {
 		detector: "cost_spike",
 		severity: "critical",
 		title: "session S1 cost spike",
-		evidence: { session_id: "S1", cost: 0.42, model: "<model>", p95: 0.12 },
+		evidence: { session_id: "S1", cost: 0.42, model: "glm-5.1", p95: 0.12 },
 	});
 
 	const res = review(db, { latest: true });

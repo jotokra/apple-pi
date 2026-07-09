@@ -93,7 +93,7 @@ function seedSession(db, { session_id = "s-1", cost = 0, errors = 0, messages = 
 		   (session_id, started_at, ended_at, last_event_at, message_count,
 		    tool_call_count, error_count, tokens_in, tokens_out, cost, model,
 		    cwd, tool_calls_json, file_path)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, '<model>', '/x', '{}', NULL)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 'glm-5.1', '/x', '{}', NULL)`,
 	).run(session_id, FIXED_TS, FIXED_TS, FIXED_TS, messages, tool_calls, errors, cost);
 }
 

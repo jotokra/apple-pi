@@ -52,7 +52,7 @@ const FIXTURES = [
 			detector: "cost_spike",
 			severity: "critical",
 			title: "session S1 cost spike",
-			evidence: { session_id: "S1", cost: 0.42, model: "<model>", p95: 0.12 },
+			evidence: { session_id: "S1", cost: 0.42, model: "glm-5.1", p95: 0.12 },
 		},
 	},
 	{
@@ -60,8 +60,8 @@ const FIXTURES = [
 		finding: {
 			detector: "model_drift",
 			severity: "warn",
-			title: "model <model> drifted",
-			evidence: { model: "<model>", recent_mean: 0.05, baseline_mean: 0.03, drift: 0.66, recent_n: 10, baseline_n: 40 },
+			title: "model glm-5.1 drifted",
+			evidence: { model: "glm-5.1", recent_mean: 0.05, baseline_mean: 0.03, drift: 0.66, recent_n: 10, baseline_n: 40 },
 		},
 	},
 	{

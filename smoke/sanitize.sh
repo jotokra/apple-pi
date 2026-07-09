@@ -36,7 +36,10 @@ FORBIDDEN=(
 )
 
 # Explicit shipped surface (none of these contain a .git dir).
-SCAN_PATHS=(config lib install.sh README.md LICENSE .docs docs guide)
+# agentdb/ is the unified DB + native kanban module (M10-4); its build/ subdir
+# is the autobuild automation workspace (task queue + logs), not product
+# surface — excluded below via --exclude-dir=build.
+SCAN_PATHS=(config lib install.sh README.md LICENSE .docs docs guide agentdb)
 
 header "sanitize: scanning ${SCAN_PATHS[*]}"
 for p in "${SCAN_PATHS[@]}"; do
@@ -49,7 +52,7 @@ for tok in "${FORBIDDEN[@]}"; do
 		[[ -z "$hit" ]] && continue
 		fail "forbidden token /$tok/ → $hit"
 		VIOLATIONS=$((VIOLATIONS + 1))
-	done < <(grep -rnE --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=cache "$tok" "${SCAN_PATHS[@]}" 2>/dev/null)
+	done < <(grep -rnE --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=cache --exclude-dir=build "$tok" "${SCAN_PATHS[@]}" 2>/dev/null)
 done
 
 # Assert the template uses placeholders (not concrete model/provider defaults).
@@ -57,6 +60,40 @@ for key in defaultModel defaultProvider; do
 	grep -qE "\"$key\":\s*\"__APPLEPI_(MODEL|PROVIDER)__\"" config/agent/settings.json.template \
 		|| { fail "settings.json.template '$key' is not a __APPLEPI_*__ placeholder"; VIOLATIONS=$((VIOLATIONS + 1)); }
 done
+
+# Dep budget (decision D10): the shipped product may add exactly chokidar as a
+# runtime dep (+ gray-matter ONLY if the D3 frontmatter parser actually falls
+# back to it). No other external module may enter package.json `dependencies`
+# or be required from agentdb/.
+header "sanitize: dependency budget (D10)"
+allowed="chokidar"
+if grep -rqE "require\(['\"]gray-matter['\"]\)|from ['\"]gray-matter['\"]" agentdb --exclude-dir=build 2>/dev/null; then
+	allowed="$allowed gray-matter"
+	info "gray-matter required in agentdb (D3 fallback) — permitted"
+fi
+
+# (a) package.json runtime dependencies must be a subset of the allowed set.
+while IFS= read -r dep; do
+	[[ -z "$dep" ]] && continue
+	if [[ " $allowed " != *" $dep "* ]]; then
+		fail "package.json dependency '$dep' outside budget (allowed: $allowed)"
+		VIOLATIONS=$((VIOLATIONS + 1))
+	fi
+done < <(node -e 'console.log(Object.keys(require("./package.json").dependencies||{}).join("\n"))')
+
+# (b) agentdb must not require/import any external module outside the allowed
+# set (node: built-ins and relative modules are always fine).
+while IFS= read -r mod; do
+	[[ -z "$mod" ]] && continue
+	case "$mod" in
+		node:*|.*) continue ;;
+	esac
+	if [[ " $allowed " != *" $mod "* ]]; then
+		fail "agentdb requires external module '$mod' outside dep budget (allowed: $allowed)"
+		VIOLATIONS=$((VIOLATIONS + 1))
+	fi
+done < <(grep -rhoE "(require\(|from )['\"][^'\"]+['\"]" agentdb --exclude-dir=build 2>/dev/null \
+	| sed -E "s/.*['\"]([^'\"]+)['\"].*/\1/" | sort -u)
 
 if [[ $VIOLATIONS -eq 0 ]]; then
 	ok "no personal identifiers in shipped tree"

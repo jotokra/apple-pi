@@ -116,13 +116,13 @@ function seed(db) {
 		session_id: "s1", started_at: "2026-07-01T10:00:00Z", ended_at: "2026-07-01T11:00:00Z",
 		last_event_at: "2026-07-01T11:00:00Z", message_count: 4, tool_call_count: 2,
 		error_count: 1, tokens_in: 1000, tokens_out: 500, cost: 0.02,
-		model: "<model>", cwd: "/Users/<user>/Projects/alpha",
+		model: "glm-5.1", cwd: "/proj/alpha",
 	});
 	insertSession(db, {
 		session_id: "s2", started_at: "2026-07-02T10:00:00Z", ended_at: "2026-07-02T10:30:00Z",
 		last_event_at: "2026-07-02T10:30:00Z", message_count: 2, tool_call_count: 1,
 		error_count: 1, tokens_in: 400, tokens_out: 100, cost: 0.01,
-		model: "minimax-m3", cwd: "/Users/<user>/Projects/beta",
+		model: "minimax-m3", cwd: "/proj/beta",
 	});
 	// events (session_id, seq order)
 	insertEvent(db, { session_id: "s1", seq: 0, type: "session", ts: "2026-07-01T10:00:00Z" });
@@ -132,7 +132,7 @@ function seed(db) {
 	insertEvent(db, { session_id: "s2", seq: 0, type: "session", ts: "2026-07-02T10:00:00Z" });
 	insertEvent(db, { session_id: "s2", seq: 1, type: "tool_call", ts: "2026-07-02T10:05:00Z", tool: "read", is_error: true });
 	// run
-	insertRun(db, { id: 1, started_at: "2026-07-03T00:00:00Z", ended_at: "2026-07-03T00:10:00Z", model: "<model>", finding_count: 2 });
+	insertRun(db, { id: 1, started_at: "2026-07-03T00:00:00Z", ended_at: "2026-07-03T00:10:00Z", model: "glm-5.1", finding_count: 2 });
 	// findings (detected_at DESC, id DESC order)
 	insertFinding(db, { id: 1, run_id: 1, detector: "error_pattern", severity: "warn", title: "bash errors", detected_at: "2026-07-03T00:05:00Z" });
 	insertFinding(db, { id: 2, run_id: 1, detector: "cost_spike", severity: "critical", title: "cost up", detected_at: "2026-07-03T00:06:00Z" });
@@ -251,7 +251,7 @@ test("db_query sessions returns rows ordered by started_at DESC NULLS LAST", () 
 test("db_query sessions filter by model", () => {
 	const db = freshDB();
 	seed(db);
-	const res = db_query({ table: "sessions", filters: { model: "<model>" }, db });
+	const res = db_query({ table: "sessions", filters: { model: "glm-5.1" }, db });
 	assert.equal(res.ok, true);
 	assert.deepEqual(res.rows.map(r => r.session_id), ["s1"]);
 });
@@ -259,11 +259,11 @@ test("db_query sessions filter by model", () => {
 test("db_query sessions filter by cwd substring ('sessions that touched project X')", () => {
 	const db = freshDB();
 	seed(db);
-	const res = db_query({ table: "sessions", filters: { cwd: "Projects/alpha" }, db });
+	const res = db_query({ table: "sessions", filters: { cwd: "proj/alpha" }, db });
 	assert.equal(res.ok, true);
 	assert.deepEqual(res.rows.map(r => r.session_id), ["s1"], "cwd LIKE match narrows to alpha");
 	// the substring is a literal bound value — a non-matching project returns []
-	const res2 = db_query({ table: "sessions", filters: { cwd: "Projects/gamma" }, db });
+	const res2 = db_query({ table: "sessions", filters: { cwd: "proj/gamma" }, db });
 	assert.equal(res2.ok, true);
 	assert.equal(res2.rows.length, 0);
 });
@@ -431,7 +431,7 @@ test("db_query with NO injected db opens AGENT_DB and reads the persisted rows",
 		assert.ok(res.rows.every(r => r.is_error === 1));
 
 		// a second table works too
-		const sess = db_query({ table: "sessions", filters: { cwd: "Projects/alpha" } });
+		const sess = db_query({ table: "sessions", filters: { cwd: "proj/alpha" } });
 		assert.equal(sess.ok, true);
 		assert.deepEqual(sess.rows.map(r => r.session_id), ["s1"]);
 
