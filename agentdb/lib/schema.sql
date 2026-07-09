@@ -190,7 +190,8 @@ CREATE TABLE IF NOT EXISTS proposals (
   source_finding_ids_json TEXT   NOT NULL DEFAULT '[]', -- JSON array of analysis_findings.id
   outcome_id             INTEGER,                      -- FK to improvement_outcomes.id (set after measure)
   proposed_at            TEXT    NOT NULL,             -- ISO8601
-  applied_at             TEXT                          -- ISO8601 (NULL until apply)
+  applied_at             TEXT,                         -- ISO8601 (NULL until apply)
+  audit                  TEXT                          -- JSON [{setting,before,after}]; set by M6-3 apply (what actually changed)
 );
 CREATE INDEX IF NOT EXISTS idx_proposals_status ON proposals(status);
 
