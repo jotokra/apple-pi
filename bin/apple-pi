@@ -113,6 +113,7 @@ function help() {
                                  parameterized filter over sess_*/analysis_*
   analyze                       run all detectors, print findings, write analysis_*
   improve [--apply] [--yes]     propose findings→proposals; --apply applies the latest (--yes to write)
+  measure [--window <ms>]       finalize applied-proposal outcomes (before vs after)
   update [--check]              release check: local vs GitHub releases (read-only)
   update --all --yes            apply: pi update --all + pull apple-pi + sync pivoice
   update --voice --yes          apply: re-sync just the pivoice bundle from upstream
@@ -170,6 +171,12 @@ function main() {
 			// (M6-1 propose always; M6-3 apply only with --apply, gated by --yes).
 			const improveCli = require(path.join(REPO, "agentdb", "analysis", "improve.js"));
 			return improveCli.run(rest);
+		}
+		case "measure": {
+			// measure wrapper — delegates to agentdb/analysis/measure-cli.js
+			// (M6-4: finalize pending outcomes for applied proposals past a window).
+			const measureCli = require(path.join(REPO, "agentdb", "analysis", "measure-cli.js"));
+			return measureCli.run(rest);
 		}
 		case "db": {
 			// durable Tier-B CLI — delegates to agentdb/db/cli.js
