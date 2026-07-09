@@ -10,6 +10,8 @@
 //
 // M8-1 shipped `index` (--rebuild = full rebuild; default = ensureCurrent).
 // M8-2 shipped the read commands: list/show/next/graph. M8-3 ships the TRUTH
+// WRITERS (new/move); M8-5 ships `validate` (CLI wrapper around the M1-3
+// validate primitive - mirror-independent, exit 1 + file:line report).
 // WRITERS: new/move. They wrap M2-5's createCard/moveStatus — which already
 // enforce the red-blue contract (resolveUnderRoot path safety +
 // legalTransition status rules) — so the CLI's job is argument plumbing,
@@ -64,6 +66,13 @@ function help() {
   move <id> <to-status> [--json] transition a card (M2-5 moveStatus)
         legal transitions only (SUPERPROMPT §5.1); diff is EXACTLY status +
         updated_at (2 lines); id resolved from the mirror (no path arg)
+
+  validate [--project P] [--root DIR] [--json]   validate .card.md frontmatter (M1-3)
+        exit 1 + file:line report on any invalid card; 0 if clean
+        --project P            scope to cards whose project == P
+        --root DIR             card root (default: current directory)
+        --json                 machine-readable { ok, cards[] }
+        mirror-independent: reads .card.md from disk, works pre-index
 
   Read commands lazily reconcile the mirror (ensureCurrent) before querying.
   DB path is $AGENT_DB, else ~/.pi/agent/agent.db.`);
@@ -487,6 +496,68 @@ function moveCmd(args) {
 	return 0;
 }
 
+// validateCmd(args) -> exit code. Wraps the M1-3 validate primitive
+// (agentdb/kb/validate.js): validates every *.card.md under root and exits 1
+// if any card is invalid, 0 if all clean — the M8-5 gate. --project scopes to
+// cards whose frontmatter project == P; --root points at a tree other than
+// cwd. validate is mirror-independent — it reads .card.md straight from disk,
+// so it works pre-index and needs no AGENT_DB (the only writer path is stderr;
+// validate never touches the kb_* mirror or Tier-B).
+//
+// On invalid, file:line errors go to stderr (human) or ride inside each card
+// object (--json); stdout carries the summary. A clean tree emits no stderr.
+function validateCmd(args) {
+	const opts = parseOpts(args);
+	const json = !!opts.bools["--json"];
+	const root = resolveRoot(opts);
+	const project = opts.values["--project"];
+
+	const { validateTree, validateCardFile } = require("./kb/validate");
+	const { findCards } = require("./kb/discover");
+
+	let cards;
+	if (project) {
+		// scope: only cards whose frontmatter project == P. Parse each to read
+		// the project; an unparseable card can't match, so it is excluded from
+		// the scoped set (validate the whole tree to surface such a card).
+		const { parseCardFile } = require("./kb/parse");
+		cards = findCards(root)
+			.filter(f => {
+				try { return parseCardFile(f).frontmatter.project === project; }
+				catch { return false; }
+			})
+			.map(f => {
+				const r = validateCardFile(f);
+				return { file: f, ok: r.ok, errors: r.errors };
+			});
+	} else {
+		cards = validateTree(root).cards;
+	}
+
+	const ok = cards.every(c => c.ok);
+	const invalidCount = cards.filter(c => !c.ok).length;
+
+	if (json) {
+		process.stdout.write(JSON.stringify({ ok, root, cards, invalid: invalidCount }, null, 2) + "\n");
+		return ok ? 0 : 1;
+	}
+
+	console.log("apple-pi kanban validate");
+	console.log(`  root   : ${root}`);
+	console.log(`  cards  : ${cards.length}`);
+	if (project) console.log(`  project: ${project}`);
+	if (ok) {
+		console.log(`  status : ok`);
+	} else {
+		console.log(`  invalid: ${invalidCount}`);
+		for (const c of cards) {
+			if (c.ok) continue;
+			for (const e of c.errors) process.stderr.write(e + "\n");
+		}
+	}
+	return ok ? 0 : 1;
+}
+
 // --- small render helpers ------------------------------------------------
 function pad(s, n) {
 	const str = s == null ? "" : String(s);
@@ -532,6 +603,8 @@ function run(args) {
 			return newCmd(rest);
 		case "move":
 			return moveCmd(rest);
+		case "validate":
+			return validateCmd(rest);
 		default:
 			console.error(`apple-pi kanban: unknown subcommand '${sub}' (try 'apple-pi kanban help')`);
 			return 2;
@@ -539,7 +612,7 @@ function run(args) {
 }
 
 module.exports = {
-	run, indexCmd, listCmd, showCmd, nextCmd, graphCmd, newCmd, moveCmd,
+	run, indexCmd, listCmd, showCmd, nextCmd, graphCmd, newCmd, moveCmd, validateCmd,
 	// exported for tests; not part of the public API
 	parseOpts, buildFilters, resolveRoot,
 };
