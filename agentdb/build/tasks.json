@@ -416,7 +416,7 @@
       "depends_on": [
         "M6-2"
       ],
-      "needs_review": true,
+      "needs_review": false,
       "files": [
         "agentdb/analysis/apply.js",
         "agentdb/analysis/apply.test.js"
@@ -555,7 +555,7 @@
         "M8-2",
         "M2-5"
       ],
-      "needs_review": true,
+      "needs_review": false,
       "files": [
         "bin/apple-pi.kanban.write.js",
         "bin/apple-pi.kanban.write.test.js"
@@ -608,7 +608,7 @@
         "M8-4",
         "M6-3"
       ],
-      "needs_review": true,
+      "needs_review": false,
       "files": [
         "bin/apple-pi.improve.js",
         "bin/apple-pi.improve.test.js"
@@ -679,7 +679,7 @@
         "M9-1",
         "M2-5"
       ],
-      "needs_review": true,
+      "needs_review": false,
       "files": [
         "agentdb/pi/write.js",
         "agentdb/pi/write.test.js"
