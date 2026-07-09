@@ -5,13 +5,20 @@
 //   apple-pi kanban show <id> [--json]                single card (incl. body)
 //   apple-pi kanban next [--json]                     WIP-aware (M0-2) + ready (M3-2)
 //   apple-pi kanban graph [--json]                    edges + ready + cycles
+//   apple-pi kanban new <id> [opts] [--json]          create a .card.md (M2-5 createCard)
+//   apple-pi kanban move <id> <to-status> [--json]    transition a card (M2-5 moveStatus)
 //
 // M8-1 shipped `index` (--rebuild = full rebuild; default = ensureCurrent).
-// M8-2 ships the read commands: list/show/next/graph. The read commands lazily
-// reconcile the mirror (ensureCurrent) before querying — SUPERPROMPT §5.2 /
-// M2-4: the query path is correct with NO manual rebuild. Later M8 cards fill
-// in new/move/validate. Mirrors vault/cli.js + sync/cli.js: CommonJS,
-// run(args) entry, node: built-ins.
+// M8-2 shipped the read commands: list/show/next/graph. M8-3 ships the TRUTH
+// WRITERS: new/move. They wrap M2-5's createCard/moveStatus — which already
+// enforce the red-blue contract (resolveUnderRoot path safety +
+// legalTransition status rules) — so the CLI's job is argument plumbing,
+// id->file resolution (via the mirror), error surfacing, and a post-write
+// reconcile so `show`/`list` reflect the change immediately. The CLI offers
+// NO path argument to the writer: `move` resolves the id ONLY from kb_cards
+// (under-root by construction), and `new --dir` is contained by
+// resolveUnderRoot. Later M8 cards fill in validate/improve. Mirrors
+// vault/cli.js + sync/cli.js: CommonJS, run(args) entry, node: built-ins.
 //
 // The DB path is whatever lib/db.js resolves ($AGENT_DB, else ~/.pi/agent/agent.db)
 // and the card root defaults to process.cwd() (override with --root) — so a
@@ -20,6 +27,7 @@
 // durable) is owned by kb/index.js's rebuild(); this CLI only dispatches + reports.
 "use strict";
 
+const path = require("node:path");
 const { open } = require("./lib/db");
 const { rebuild, ensureCurrent } = require("./kb/index");
 const { list } = require("./kb/query");       // M3-1 filter queries
@@ -47,6 +55,16 @@ function help() {
 
   graph [--json]                 edges (depends_on) + ready set + cycles
 
+  new <id> [opts] [--json]       create a .card.md (M2-5 createCard)
+        --title T --status S --priority N --project P --assignee A --parent X
+        --tag T (repeatable) --dep D (repeatable) --body "..."
+        --dir SUBDIR            card subdir under root (default: cards)
+        path safety + schema enforced; rejects with NO file write
+
+  move <id> <to-status> [--json] transition a card (M2-5 moveStatus)
+        legal transitions only (SUPERPROMPT §5.1); diff is EXACTLY status +
+        updated_at (2 lines); id resolved from the mirror (no path arg)
+
   Read commands lazily reconcile the mirror (ensureCurrent) before querying.
   DB path is $AGENT_DB, else ~/.pi/agent/agent.db.`);
 }
@@ -55,8 +73,8 @@ function help() {
 // parseOpts(args) -> { values, multi, bools, positionals }. value flags consume
 // the next arg; multi flags accumulate; bool flags are presence-only; anything
 // else is a positional. Unknown --flags are ignored (forward-compat).
-const VALUE_FLAGS = new Set(["--root", "--status", "--project", "--assignee", "--priority", "--priority-min", "--priority-max", "--parent"]);
-const MULTI_FLAGS = new Set(["--tag"]);
+const VALUE_FLAGS = new Set(["--root", "--status", "--project", "--assignee", "--priority", "--priority-min", "--priority-max", "--parent", "--title", "--dir", "--body"]);
+const MULTI_FLAGS = new Set(["--tag", "--dep"]);
 const BOOL_FLAGS = new Set(["--json"]);
 function parseOpts(args) {
 	const out = { values: {}, multi: {}, bools: {}, positionals: [] };
@@ -329,6 +347,146 @@ function graphCmd(args) {
 	}
 }
 
+// newCmd(args) -> exit code. Wraps M2-5 createCard: writes a new .card.md
+// at <root>/<dir>/<id>.card.md (dir defaults to "cards"), validates it (M1-3
+// primitive), and reconciles the mirror so `show`/`list` see it immediately.
+//
+// RED-BLUE: every reject path (bad slug, bogus status, path-escaping --dir,
+// duplicate id) comes back from createCard as { ok:false } with NO file write —
+// resolveUnderRoot + the exists() check are the safety net; the CLI only
+// surfaces the errors to stderr + a non-zero exit. --dir is contained by
+// resolveUnderRoot, so the writer never escapes root.
+function newCmd(args) {
+	const opts = parseOpts(args);
+	const json = !!opts.bools["--json"];
+	const root = resolveRoot(opts);
+	const id = opts.positionals[0];
+	const dir = opts.values["--dir"] || "cards";
+
+	if (!id) {
+		console.error("apple-pi kanban new: missing <id> (try 'apple-pi kanban help')");
+		return 2;
+	}
+
+	// Assemble the card spec from flags. createCard stamps created_at +
+	// updated_at, defaults status to triage, and validates the frontmatter;
+	// we only forward what the caller actually passed.
+	const card = { id, parent: opts.values["--parent"] ?? "root" };
+	if (opts.values["--title"] !== undefined) card.title = opts.values["--title"];
+	if (opts.values["--status"] !== undefined) card.status = opts.values["--status"];
+	if (opts.values["--priority"] !== undefined) card.priority = parsePriorityInt(opts.values["--priority"]);
+	if (opts.values["--project"] !== undefined) card.project = opts.values["--project"];
+	if (opts.values["--assignee"] !== undefined) card.assignee = opts.values["--assignee"];
+	const tags = opts.multi["--tag"] || [];
+	if (tags.length) card.tags = tags;
+	const deps = opts.multi["--dep"] || [];
+	if (deps.length) card.depends_on = deps;
+	if (opts.values["--body"] !== undefined) card.body = opts.values["--body"];
+
+	const { createCard } = require("./kb/write");
+	const res = createCard({ root, dir, card });
+	if (!res.ok) {
+		for (const e of res.errors) console.error(`apple-pi kanban new: ${e}`);
+		return 1;
+	}
+	const file = res.file;
+
+	// validate the freshly-written card (the M1-3 primitive M8-5 will wrap).
+	// createCard already ran validateCard internally, so a failure here is a
+	// bug we want surfaced loudly, not a silently-bad card on disk.
+	const { validateCardFile } = require("./kb/validate");
+	const v = validateCardFile(file);
+	if (!v.ok) {
+		for (const e of v.errors) console.error(`apple-pi kanban new: ${e}`);
+		return 1;
+	}
+
+	// reconcile so the next read sees the new card without a manual index.
+	const db = open();
+	try { ensureCurrent(db, root); } finally { db.close(); }
+
+	const rel = path.relative(root, file);
+	const title = card.title ?? id;
+	const status = card.status ?? "triage";
+	if (json) {
+		process.stdout.write(JSON.stringify({ ok: true, id, title, status, file: rel }, null, 2) + "\n");
+		return 0;
+	}
+	console.log("apple-pi kanban new");
+	console.log(`  id     : ${id}`);
+	console.log(`  title  : ${title}`);
+	console.log(`  status : ${status}`);
+	console.log(`  file   : ${rel}`);
+	return 0;
+}
+
+// moveCmd(args) -> exit code. Wraps M2-5 moveStatus: transitions a card's
+// status, preserving every other byte (the on-disk diff is EXACTLY status +
+// updated_at — 2 lines).
+//
+// RED-BLUE: the id is resolved ONLY from kb_cards (after a lazy ensureCurrent),
+// so the caller cannot steer the writer at an arbitrary file — the file_path
+// came from findCards (under-root by construction). moveStatus then re-runs
+// resolveUnderRoot (path safety) + legalTransition (status rules); any reject
+// returns { ok:false } with NO file write, surfaced here as exit 1. The CLI
+// accepts no path argument: `<id> <to-status>` only.
+function moveCmd(args) {
+	const opts = parseOpts(args);
+	const json = !!opts.bools["--json"];
+	const root = resolveRoot(opts);
+	const id = opts.positionals[0];
+	const to = opts.positionals[1];
+
+	if (!id) {
+		console.error("apple-pi kanban move: missing <id> <to-status> (try 'apple-pi kanban help')");
+		return 2;
+	}
+	if (!to) {
+		console.error("apple-pi kanban move: missing <to-status> (try 'apple-pi kanban help')");
+		return 2;
+	}
+
+	// resolve id -> file via the mirror (lazy reconcile first). The mirror only
+	// holds under-root cards, so this lookup cannot escape root.
+	let fileAbs = null;
+	let fromStatus = null;
+	const db = open();
+	try {
+		ensureCurrent(db, root);
+		const row = db.prepare("SELECT file_path, status FROM kb_cards WHERE id = ?").get(id);
+		if (!row) {
+			console.error(`apple-pi kanban move: no card with id '${id}'`);
+			return 1;
+		}
+		fileAbs = row.file_path;
+		fromStatus = row.status;
+	} finally {
+		db.close();
+	}
+
+	const fileRel = path.relative(root, fileAbs);
+	const { moveStatus } = require("./kb/write");
+	const res = moveStatus({ root, file: fileRel, to });
+	if (!res.ok) {
+		for (const e of res.errors) console.error(`apple-pi kanban move: ${e}`);
+		return 1;
+	}
+
+	// reindex so the mirror reflects the new status for the next read.
+	const db2 = open();
+	try { ensureCurrent(db2, root); } finally { db2.close(); }
+
+	if (json) {
+		process.stdout.write(JSON.stringify({ ok: true, id, from: fromStatus, to, file: fileRel }, null, 2) + "\n");
+		return 0;
+	}
+	console.log("apple-pi kanban move");
+	console.log(`  id     : ${id}`);
+	console.log(`  ${fromStatus} -> ${to}`);
+	console.log(`  file   : ${fileRel}`);
+	return 0;
+}
+
 // --- small render helpers ------------------------------------------------
 function pad(s, n) {
 	const str = s == null ? "" : String(s);
@@ -370,6 +528,10 @@ function run(args) {
 			return nextCmd(rest);
 		case "graph":
 			return graphCmd(rest);
+		case "new":
+			return newCmd(rest);
+		case "move":
+			return moveCmd(rest);
 		default:
 			console.error(`apple-pi kanban: unknown subcommand '${sub}' (try 'apple-pi kanban help')`);
 			return 2;
@@ -377,7 +539,7 @@ function run(args) {
 }
 
 module.exports = {
-	run, indexCmd, listCmd, showCmd, nextCmd, graphCmd,
+	run, indexCmd, listCmd, showCmd, nextCmd, graphCmd, newCmd, moveCmd,
 	// exported for tests; not part of the public API
 	parseOpts, buildFilters, resolveRoot,
 };
