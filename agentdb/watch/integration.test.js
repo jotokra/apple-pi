@@ -81,9 +81,15 @@ function fileDB(file) {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // waitFor(fn, {timeout, interval}) — poll fn() (truthy = pass) until timeout.
-// The ACCEPTANCE latency is ~300 ms; we poll every 25 ms with a 3 s CI ceiling
-// so a loaded runner still passes while a genuinely-broken watcher fails fast.
-async function waitFor(fn, { timeout = 3000, interval = 25 } = {}) {
+// The ACCEPTANCE latency is ~300 ms; we poll every 25 ms. The ceiling is
+// 8 s (not 3 s) because the full regression runs every test file in ONE node
+// process (`find ... -exec node --test {} +`), so fsevents delivery + the
+// debounce timer contend with 470+ other tests for the event loop — under that
+// load a real fsevents callback for a new file can land well past 3 s. A higher
+// ceiling cannot mask a real bug (a broken watcher never satisfies the poll);
+// it only stops a loaded runner from false-failing. See operator pass
+// 2026-07-09 (this flake halted M7-2/M8-4/M8-6/M9-2/M9-3/M9-4/M9-5).
+async function waitFor(fn, { timeout = 8000, interval = 25 } = {}) {
 	const deadline = Date.now() + timeout;
 	while (Date.now() < deadline) {
 		try { if (fn()) return true; } catch { /* poll again */ }
