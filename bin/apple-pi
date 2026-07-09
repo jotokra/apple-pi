@@ -109,6 +109,8 @@ function help() {
   vault add|list|get|remove|prune-transient   credential vault (headless)
   kanban index|list|show|next|graph   kb_* kanban mirror (index reindexes; the
                                      rest read; next is WIP+ready-aware)
+  db ingest|status|query        durable Tier-B: append-only ingest, counts,
+                                 parameterized filter over sess_*/analysis_*
   analyze                       run all detectors, print findings, write analysis_*
   update [--check]              release check: local vs GitHub releases (read-only)
   update --all --yes            apply: pi update --all + pull apple-pi + sync pivoice
@@ -161,6 +163,13 @@ function main() {
 			// only; never mutates sess_*/kb_*/the world).
 			const analyzeCli = require(path.join(REPO, "agentdb", "analysis", "cli.js"));
 			return analyzeCli.run(rest);
+		}
+		case "db": {
+			// durable Tier-B CLI — delegates to agentdb/db/cli.js
+			// (ingest = M4-2 append-only resume; status = row counts;
+			// query = parameterized filter over sess_*/analysis_*).
+			const dbCli = require(path.join(REPO, "agentdb", "db", "cli.js"));
+			return dbCli.run(rest);
 		}
 		case "update":     return update(rest);
 		default:
