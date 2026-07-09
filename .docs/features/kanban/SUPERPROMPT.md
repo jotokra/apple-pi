@@ -90,13 +90,13 @@ remote/multi-device sync server can sit behind it without touching callers.
 | D9 | Improvement-loop autonomy | **Analyze + propose + measure = autonomous + scheduled** (launchd). **Apply = human-gated** (`apple-pi apply --yes`, existing posture). Nothing self-applies without explicit yes. |
 | D10 | New runtime deps | **chokidar only** (+ gray-matter only if D3 falls back). Dep budget stated in M10. |
 
-## 4. the-agent leftover analysis — keep / redesign / drop
+## 4. Legacy-kanban leftover analysis — keep / redesign / drop
 
-| the-agent piece | Verdict | Why |
+| Legacy piece | Verdict | Why |
 |---|---|---|
 | `.kanban/cards/*.md` per-project card files | **KEEP** | Human-readable current-state truth (Principle A) |
 | `tasks` SQLite (40+ orchestrator cols: claim_lock, circuit breaker, goal_mode, heartbeat…) | **REDESIGN → `kb_*` slim mirror** | It's a job-orchestrator DB; decouple truth from execution |
-| Boards JSON (`~//<agent-dir>/kanban/boards/`) | **DROP** | Third representation; pure duplication |
+| Boards JSON (the legacy boards dir) | **DROP** | Third representation; pure duplication |
 | `kanban-roadmap-sync` 12h cron | **REDESIGN → instant chokidar reindex** | 12h lag = the #1 "unreliable" complaint |
 | Dispatcher + worker fleet + profiles | **DROP (v1)** | The complexity sinkhole; an *executor*, not a *kanban* |
 | claim_lock / failures / retries / goal_mode / heartbeat | **DROP** | Dispatcher mechanics |
@@ -104,10 +104,10 @@ remote/multi-device sync server can sit behind it without touching callers.
 | Per-task logs, watchdog, ops-healer | **DROP** | Self-healing for complexity we're removing |
 | Events/comments/attachments/notify tables | **SIMPLIFY** | Comments live in the card body; events come from session ingest instead |
 | Web kanban frontend | **REDESIGN → optional reader** vs the new DB | Separate post-v1 module |
-| `kanban-bridge.ts` (pi read-only bridge to the-agent DB) | **REPLACE** | With MD-aware read/write tools (M9) |
-| the-agent `tasks`-as-execution-queue | **REDESIGN** → the `sess_*`+`analysis_*` durable tier replaces "agent memory"; execution (if ever) is a separate reader | Keep memory, drop the fleet |
+| `kanban-bridge.ts` (pi read-only bridge to the legacy DB) | **REPLACE** | With MD-aware read/write tools (M9) |
+| The legacy `tasks`-as-execution-queue | **REDESIGN** → the `sess_*`+`analysis_*` durable tier replaces "agent memory"; execution (if ever) is a separate reader | Keep memory, drop the fleet |
 
-**Net:** ~80% of the-agent surface goes away; what remains is cards + a fast
+**Net:** ~80% of the legacy surface goes away; what remains is cards + a fast
 tiered DB + thin agent tools + an autonomous improvement loop.
 
 ## 5. Schemas

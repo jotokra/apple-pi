@@ -21,7 +21,7 @@
 | M8 | CLI `apple-pi kanban` + `db` + `analyze`/`improve` | 8 | M3,M4,M5,M6 | M8-1..5 then 6..8 |
 | M9 | Pi agent tools | 6 | M8 | yes |
 | M10 | Validation + smokes (incl. tier-isolation) | 4 | M9 | yes |
-| M11 | Migration (cards + 89 sessions + autoresearch; decommission the-agent) | 4 | M10 | yes |
+| M11 | Migration (cards + 89 sessions + autoresearch; decommission the legacy kanban) | 4 | M10 | yes |
 
 **Critical path:** M0 → M1 → M2-1 → M2-2 → M3 → M4 → M5 → M8(kanban+ingest) →
 M9 → **M10-2 (tier isolation)** → M11. M6/M7 parallel once M2 is up.
@@ -428,14 +428,14 @@ M9 → **M10-2 (tier isolation)** → M11. M6/M7 parallel once M2 is up.
 - **Verify:** status parity before/after.
 - **Commit:** `chore(agentdb): absorb autoresearch.db into agent.db (M11-3)`
 
-### M11-4 · Decommission the-agent kanban (gated, last) ⬜  *(confirm with user first)*
-- **What:** stop the `kanban-roadmap-sync` cron; archive `~//<agent-dir>/kanban/boards/`;
-  unset pi `KANBAN_DB_PATH` (was the the-agent DB); remove `kanban-bridge.ts`
+### M11-4 · Decommission the legacy kanban (gated, last) ⬜  *(confirm with user first)*
+- **What:** stop the `kanban-roadmap-sync` cron; archive the legacy boards dir;
+  unset pi `KANBAN_DB_PATH` (was the legacy DB); remove `kanban-bridge.ts`
   post-deprecation. **Confirm with user before disabling the cron** (it feeds
   the web kanban today).
 - **REQ-M11-4:** new tools the only kanban surface; web kanban either repointed
   or formally retired.
-- **Verify:** `apple-pi kanban list` works with no the-agent DB.
+- **Verify:** `apple-pi kanban list` works with no legacy DB.
 - **Commit:** `chore(kanban): decommission hermes sync + bridge (M11-4)`
 
 ---
