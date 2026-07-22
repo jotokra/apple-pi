@@ -1,0 +1,7 @@
+# apple-pi-mobile-bridge runtime artifacts. Never committed.
+# (parent .gitignore already covers node_modules/ and *.log)
+var/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
