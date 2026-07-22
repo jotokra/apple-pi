@@ -45,7 +45,11 @@ mkdir -p "$FAKE_HOME/Library/LaunchAgents" "$FAKE_HOME/.pi/agent"
 # exercise and symlink everything else from the real checkout.
 SANDBOX="$WORK/sandbox"
 mkdir -p "$SANDBOX"
-for entry in bin lifecycle mobile-bridge vault sync lib; do
+# Symlink the dirs the CLI/installer walks, EXCEPT mobile-bridge — that one
+# we build as a real sandbox dir below with a stubbed bridge.mjs, because
+# writing through a symlinked mobile-bridge would clobber the REAL
+# mobile-bridge/bin/bridge.mjs in the checkout (the original bug).
+for entry in bin lifecycle vault sync lib; do
 	[[ -e "$REPO/$entry" ]] || continue
 	ln -s "$REPO/$entry" "$SANDBOX/$entry"
 done
