@@ -162,6 +162,7 @@ plan, navigate back.
 | `long-horizon-compaction` | tree-structured sessions + deliberate compaction |
 | `n8n-workflow-author` | design an n8n workflow end-to-end |
 | `autonomous-execution` | the apple-pi default — agents run tools without approval prompts; hard guards (sysinfo-guard) are the only exception |
+| `config-sync` | multi-device: keep the portable `~/.pi` config in sync across machines (secrets never leave the device) |
 
 ### How-to guides
 
@@ -231,12 +232,12 @@ design + attacker model:
 | Surface | Count | What |
 |---|---|---|
 | Persona | 1 | `config/agent/AGENTS.md` — the contract every session loads |
-| Skills | 9 | plan-decompose, read-docs-first, verify-own-work, red-blue, long-horizon-compaction, **self-assess**, session-record, n8n-workflow-author, **autonomous-execution** |
+| Skills | 10 | plan-decompose, read-docs-first, verify-own-work, red-blue, long-horizon-compaction, **self-assess**, session-record, n8n-workflow-author, autonomous-execution, **config-sync** |
 | Prompts | 4 | `/decompose`, `/spec`, `/redteam`, `/design` |
-| Extensions | 9 | sysinfo-guard (always on), **web** (search/fetch/browser, default on), **voice** (`/voice` ↔ pivoice), **credential-vault** (on demand, env-configured), n8n/forgejo/netbird/llm/kanban/telegram (on demand) |
+| Extensions | 11 | sysinfo-guard (always on), **web** (search/fetch/browser, default on), **voice** (`/voice` ↔ pivoice), **credential-vault** (on demand, env-configured), **sync** (config-sync), n8n/forgejo/netbird/llm/kanban/telegram (on demand) |
 | Wizard | 1 | `install.sh` + `lib/` (P0–P1 + handoff) |
 | Handoff | 1 | `lib/handoff.md` — drives the agent through P2–P5 |
-| Smoke | 8 | sanitize · structure · onboard-sandbox · vault-roundtrip · vault-tracefree · vault-telemetry-safe · vault-rotate-import-export · vault-onboarding |
+| Smoke | 43 | sanitize · structure · onboard-sandbox · vault-* · sync-* · ingress-* · mcp-* · autobuild-* · mobile-* · vault-wire — full suite via `bash smoke/run.sh` |
 
 The **self-assess** skill is the heart of "tune yourself to my model" — a
 recurring 3-iteration ritual (discovery → red/blue → apply+reevaluate) that
