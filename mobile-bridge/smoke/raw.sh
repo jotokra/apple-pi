@@ -83,6 +83,11 @@ PICK="$(
 info "picked session: $PICK"
 
 FULL_PATH="$SESSIONS_DIR/$PICK"
+# Extract the UUID component from the filename. v3 sessions use the
+# pattern `<UTC-timestamp>_UUID.jsonl`; the UUID is everything after
+# the last underscore up to `.jsonl`.
+SESSION_UUID="${PICK%.jsonl}"
+SESSION_UUID="${SESSION_UUID##*_}"
 
 header "T5-T1/T2: validateSessionFile returns isValid=true + sizeBytes>0"
 META="$(node --input-type=module -e "
@@ -206,5 +211,85 @@ echo "$ERR_OUT" | grep -q "NF:NOT_FOUND" \
 echo "$ERR_OUT" | grep -q "NJ:NOT_JSONL" \
   || { fail "T5-T6: non-.jsonl file should throw RawError(NOT_JSONL), got:"; echo "$ERR_OUT"; exit 1; }
 ok "T5-T6: NOT_FOUND + NOT_JSONL typed errors raised"
+
+# HTTP-layer smoke: actually exercises the Fastify route registered in
+# bridge.mjs. Requires a running bridge (start it first):
+#   cd mobile-bridge && BRIDGE_PORT=7892 PI_SESSIONS_DIR=/path/to/.pi/sessions node bin/bridge.mjs
+# then re-run this smoke. When the bridge isn't running (e.g. a fresh
+# checkout before the first `apple-pi mobile start`), the HTTP section
+# is skipped — the lib-direct section above is the authoritative test
+# for the streaming surface; the HTTP section just verifies the Fastify
+# wiring matches.
+if curl -fsS "http://${BRIDGE_HOST:-127.0.0.1}:${BRIDGE_PORT:-7892}/v1/health" >/dev/null 2>&1; then
+  header "T5-H1: 401 without bearer"
+  CODE_NOAUTH=$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "Accept: application/x-ndjson" \
+    "http://${BRIDGE_HOST:-127.0.0.1}:${BRIDGE_PORT:-7892}/v1/sessions/${SESSION_UUID}/raw")
+  [[ "$CODE_NOAUTH" == "401" ]] \
+    || { fail "T5-H1: unauth /raw should return 401, got $CODE_NOAUTH"; exit 1; }
+  ok "T5-H1: /raw without Authorization: Bearer header returns 401"
+
+  header "T5-H2: pair → bearer → happy path 200 + NDJSON content-type"
+  CODE_ISSUE=$(curl -fsS -X POST "http://${BRIDGE_HOST:-127.0.0.1}:${BRIDGE_PORT:-7892}/v1/pair/issue")
+  CODE=$(printf '%s' "$CODE_ISSUE" | grep -oE '"code":"[A-Z0-9]+"' | cut -d'"' -f4)
+  [[ -n "$CODE" ]] || { fail "T5-H2: couldn't extract pairing code from $CODE_ISSUE"; exit 1; }
+  TOKEN_JSON=$(curl -fsS -X POST -H "Content-Type: application/json" \
+    -d "{\"code\":\"$CODE\"}" \
+    "http://${BRIDGE_HOST:-127.0.0.1}:${BRIDGE_PORT:-7892}/v1/pair")
+  TOKEN=$(printf '%s' "$TOKEN_JSON" | grep -oE '"token":"[a-f0-9]+"' | cut -d'"' -f4)
+  [[ -n "$TOKEN" ]] || { fail "T5-H2: couldn't extract token from $TOKEN_JSON"; exit 1; }
+  HTTP_OUT=$(curl -s -D /tmp/raw_headers -o /tmp/raw_body -w "%{http_code}" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Accept: application/x-ndjson" \
+    "http://${BRIDGE_HOST:-127.0.0.1}:${BRIDGE_PORT:-7892}/v1/sessions/${SESSION_UUID}/raw")
+  [[ "$HTTP_OUT" == "200" ]] \
+    || { fail "T5-H2: bearer-auth /raw should return 200, got $HTTP_OUT"; cat /tmp/raw_headers; exit 1; }
+  grep -qi '^content-type: application/x-ndjson' /tmp/raw_headers \
+    || { fail "T5-H2: should serve content-type: application/x-ndjson"; cat /tmp/raw_headers; exit 1; }
+  ok "T5-H2: /raw returns 200 + content-type: application/x-ndjson"
+
+  header "T5-H3: first message record in NDJSON stream carries a role field"
+  # The first line of any v3 session is the header ({type:'session',...})
+  # which has no role field — the role field lives on the FIRST MESSAGE
+  # record. Plan-01 says: 'first line is JSON with role field'; we
+  # honour the spirit of that assertion by checking the first message
+  # record, which is what the iOS app actually renders.
+  node --input-type=module -e "
+    import { parseLine } from './mobile-bridge/lib/raw.mjs';
+    import { readFileSync } from 'node:fs';
+    const text = readFileSync('/tmp/raw_body', 'utf8');
+    let found = null;
+    let i = 0;
+    for (const line of text.split('\n').filter(l => l.length)) {
+      i++;
+      const r = parseLine(line);
+      if (r && r.message && typeof r.message.role === 'string') {
+        found = { line: i, role: r.message.role, type: r.type };
+        break;
+      }
+    }
+    if (!found) { console.error('NO_MESSAGE_RECORD'); process.exit(1); }
+    if (!['user','assistant','tool','system'].includes(found.role)) {
+      console.error('BAD_ROLE:' + found.role);
+      process.exit(1);
+    }
+    console.log('FIRST_MSG_LINE=' + found.line);
+    console.log('FIRST_MSG_ROLE=' + found.role);
+  " || { fail "T5-H3: first message record check failed"; cat /tmp/raw_body; exit 1; }
+  ok "T5-H3: first message record in NDJSON stream carries role field (user|assistant|tool|system)"
+
+  header "T5-H4: 404 on unknown session id"
+  HTTP_404=$(curl -s -o /tmp/raw_404_body -w "%{http_code}" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Accept: application/x-ndjson" \
+    "http://${BRIDGE_HOST:-127.0.0.1}:${BRIDGE_PORT:-7892}/v1/sessions/00000000-0000-0000-0000-000000000000/raw")
+  [[ "$HTTP_404" == "404" ]] \
+    || { fail "T5-H4: unknown uuid should 404, got $HTTP_404"; cat /tmp/raw_404_body; exit 1; }
+  grep -q '"error":"NOT_FOUND"' /tmp/raw_404_body \
+    || { fail "T5-H4: 404 body should include error:NOT_FOUND, got:"; cat /tmp/raw_404_body; exit 1; }
+  ok "T5-H4: unknown uuid → 404 with structured error envelope"
+else
+  warn "T5-H*: bridge not running on ${BRIDGE_HOST:-127.0.0.1}:${BRIDGE_PORT:-7892}; HTTP-layer tripwires skipped. Start with: cd mobile-bridge && BRIDGE_PORT=7892 PI_SESSIONS_DIR=\$HOME/.pi/sessions node bin/bridge.mjs"
+fi
 
 ok "raw"

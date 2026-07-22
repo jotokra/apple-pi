@@ -21,6 +21,7 @@
 import Fastify from "fastify";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { promises as fs } from "node:fs";
 
 import { State, defaultStatePath } from "../lib/state.mjs";
 import * as pairing from "../lib/pairing.mjs";
@@ -28,6 +29,10 @@ import {
   SESSIONS_DIR,
   listSessions,
 } from "../lib/sessions.mjs";
+import {
+  streamSessionJsonl,
+  RawError,
+} from "../lib/raw.mjs";
 
 const PORT = Number(process.env.BRIDGE_PORT ?? 7892);
 const HOST = process.env.BRIDGE_HOST ?? "127.0.0.1";
@@ -151,6 +156,84 @@ app.get("/v1/sessions", async () => ({
   schema_version: 1,
   sessions: await listSessions(),
 }));
+
+// T5 — read-only NDJSON stream of the raw session JSONL.
+//
+// Resolves `:id` (the UUID stored as the trailing component of every
+// ~/.pi/sessions/*.jsonl filename) to an absolute path, then pipes the
+// file through `lib/raw.mjs::streamSessionJsonl` into Fastify's reply.
+//
+// Auth: required (the preHandler hook installed by T3 has already
+// authenticated `req.pair` by the time we get here). Returns 401
+// implicitly on a missing/invalid bearer.
+//
+// Failure modes (RawError → HTTP status via setErrorHandler below):
+//   NOT_FOUND         → 404  (no file with matching UUID)
+//   NOT_JSONL         → 415  (filename shape is wrong for a session)
+//   MALFORMED_JSONL   → 422  (header is missing or non-JSON)
+//   file > cap        → 200  truncated; bytes past cap dropped at the
+//                              last line boundary (x-raw-capped: true).
+//                              Phase 0 honour the cap silently rather
+//                              than reject — per plan-01 Task 5:
+//                              "Cap at min(file size, 50MB) for now".
+async function resolveSessionJsonlPath(id) {
+  const dir = SESSIONS_DIR();
+  // Phase 0: O(n) readdir lookup. Sessions dir typically has < 1k
+  // files; this is fine. For Phase 1+ (many sessions) a per-process
+  // map would be cleaner.
+  const entries = await fs.readdir(dir);
+  for (const name of entries) {
+    if (!name.endsWith(".jsonl")) continue;
+    if (name.startsWith(".")) continue; // dotfiles (lock, swap)
+    const stem = name.slice(0, -".jsonl".length);
+    const idx = stem.lastIndexOf("_");
+    if (idx < 0) continue;
+    const candidate = stem.slice(idx + 1);
+    if (candidate === id) {
+      return path.join(dir, name);
+    }
+  }
+  throw new RawError(
+    "NOT_FOUND",
+    `no session file with uuid ${id} in ${dir}`,
+  );
+}
+
+app.get("/v1/sessions/:id/raw", async (req, reply) => {
+  const id = req.params.id;
+  const jsonlPath = await resolveSessionJsonlPath(id);
+  const { readable, capBytes, capped } = streamSessionJsonl(jsonlPath);
+  reply.header("content-type", "application/x-ndjson");
+  reply.header("x-raw-cap-bytes", String(capBytes));
+  reply.header("x-raw-capped", String(capped));
+  reply.header("x-raw-session-uuid", id);
+  reply.header("content-length", String(capBytes));
+  // Fastify's reply.send(stream) handles backpressure + chunked
+  // transfer encoding; we set content-length here so HTTP/1.1 clients
+  // know the body size up front (no chunked transfer-encoding needed).
+  return reply.send(readable);
+});
+
+// T5 — error mapper. RawError thrown anywhere in the route handler
+// chain (validateSessionFile, streamSessionJsonl, resolveSession...)
+// lands here, where we translate the typed `code` to an HTTP status.
+app.setErrorHandler((err, req, reply) => {
+  if (err instanceof RawError) {
+    const status =
+      err.code === "NOT_FOUND"        ? 404 :
+      err.code === "NOT_JSONL"        ? 415 :
+      err.code === "MALFORMED_JSONL"  ? 422 :
+      err.code === "TOO_LARGE"        ? 413 :
+      500;
+    return reply.code(status).send({
+      error: err.code,
+      message: err.message,
+    });
+  }
+  // Fall through to Fastify's default handler (logs the error).
+  req.log.error({ err }, "mobile-bridge unhandled error");
+  return reply.send(err);
+});
 
 // Surface the package root so downstream tasks can derive
 // var/state.json / sessions-dir paths without re-implementing this
