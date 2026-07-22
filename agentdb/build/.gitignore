@@ -1,0 +1,6 @@
+progress.json
+logs/
+BUILD.md
+.lock
+*.prompt
+tasks.json

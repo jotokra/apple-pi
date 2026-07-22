@@ -29,7 +29,7 @@ header "E-1.1: env.local merged into process.env"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/agent"
 printf 'FORGEJO_BASE_URL=https://git.example.com\nKANBAN_DB_PATH=%s/k.db\n' "$TMP" > "$TMP/agent/env.local"
-OUT="$(PI_CODING_AGENT_DIR="$TMP" "${NODE_TS[@]}" --input-type=module -e "
+OUT="$(env -u FORGEJO_BASE_URL -u KANBAN_DB_PATH PI_CODING_AGENT_DIR="$TMP" "${NODE_TS[@]}" --input-type=module -e "
 	import('./config/extensions/_lib/envlocal.ts').then(() => {
 		console.log(process.env.FORGEJO_BASE_URL + '|' + process.env.KANBAN_DB_PATH);
 	});

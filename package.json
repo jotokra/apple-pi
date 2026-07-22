@@ -10,5 +10,8 @@
   },
   "devDependencies": {
     "vitepress": "^1.6.4"
+  },
+  "dependencies": {
+    "chokidar": "^5.0.0"
   }
 }
