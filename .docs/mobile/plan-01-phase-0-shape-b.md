@@ -1,6 +1,6 @@
 # apple-pi mobile — Phase 0 (Bridge MVP) Shape B
 
-> **For the-agent:** Use subagent-driven-development / kanban-orchestrator
+> **For the operator:** Use subagent-driven-development / kanban-orchestrator
 > to execute task-by-task. Every task = one card = one commit.
 > TDD-first per existing apple-pi convention (`smoke/<name>.sh`).
 

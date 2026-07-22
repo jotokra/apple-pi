@@ -219,7 +219,7 @@ handshake. The store is sovereign end-to-end.
       "pair_id": "dev_pair_01HX...",
       "created_at": "...",
       "last_seen": "...",
-      "ip_at_pair": "<overlay-ip>",
+      "ip_at_pair": "100.64.0.1",
       "label": "Jonathan's iPhone"
     }
   ],
