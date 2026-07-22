@@ -33,10 +33,24 @@ import {
   streamSessionJsonl,
   RawError,
 } from "../lib/raw.mjs";
+import { validateAndIssue, IapError } from "../lib/iap.mjs";
 
 const PORT = Number(process.env.BRIDGE_PORT ?? 7892);
 const HOST = process.env.BRIDGE_HOST ?? "127.0.0.1";
 const VERSION = "0.1.0";
+
+// Phase 1 — IAP receipt validation. The subscription GATE is opt-in:
+// only bridges that set BRIDGE_REQUIRE_IAP=1 reject pairing-only tokens
+// on /v1/sessions* with 402. Default (unset) preserves Phase 0
+// behaviour (any valid token reads) for local/dev + the App-Review demo
+// bridge. The Apple verifier URLs/secret are env-overridable so the smoke
+// can point at a local mock and run fully offline.
+const REQUIRE_IAP = process.env.BRIDGE_REQUIRE_IAP === "1";
+const IAP_VERIFIER_OPTS = {
+  ...(process.env.APPLE_VERIFY_PROD_URL ? { prodUrl: process.env.APPLE_VERIFY_PROD_URL } : {}),
+  ...(process.env.APPLE_VERIFY_SANDBOX_URL ? { sandboxUrl: process.env.APPLE_VERIFY_SANDBOX_URL } : {}),
+  ...(process.env.APPLE_SHARED_SECRET ? { sharedSecret: process.env.APPLE_SHARED_SECRET } : {}),
+};
 
 const __filename = fileURLToPath(import.meta.url);
 const PKG_ROOT = path.resolve(path.dirname(__filename), "..");
@@ -92,13 +106,43 @@ function humanizePairError(reason) {
   }
 }
 
+// Phase 1 — IAP receipt validation → subscription-gated bearer token.
+// Unauthenticated (the receipt IS the credential). On an active Apple
+// subscription, issues (or rotates) a token whose pair row is linked to
+// the receipt; on inactive/expired/refunded/invalid, returns 402 with
+// the subscription status so the app can act on it (re-purchase,
+// restore, refresh). Apple-call config comes from IAP_VERIFIER_OPTS.
+app.post("/v1/iap/validate", async (req, reply) => {
+  let body = req.body;
+  if (typeof body === "string") {
+    try { body = JSON.parse(body); } catch { body = {}; }
+  }
+  const receipt = body && typeof body === "object" ? body.receipt : undefined;
+  try {
+    const result = await validateAndIssue(state, receipt, IAP_VERIFIER_OPTS);
+    if (result.token) {
+      return reply.code(200).send(result);
+    }
+    // Valid Apple response but no active entitlement.
+    return reply.code(402).send({
+      error: "payment_required",
+      subscription: result.subscription,
+    });
+  } catch (err) {
+    if (err instanceof IapError) {
+      return reply.code(err.status).send({ error: err.reason });
+    }
+    throw err;
+  }
+});
+
 // T3 — preHandler bearer-token gate. Applied to ALL routes except
 // the unauthenticated ones below. Pattern matches plan-01 Task 3
 // Step 4 + SUPERPROMPT §7.1 (auth scheme).
 //
 // We attach the resolved pair row to `req.pair` so handlers can
 // access it without re-querying state.
-const UNAUTHENTICATED = new Set(["/v1/health", "/v1/pair/issue"]);
+const UNAUTHENTICATED = new Set(["/v1/health", "/v1/pair/issue", "/v1/iap/validate"]);
 app.addHook("preHandler", async (req, reply) => {
   const url = req.url.split("?")[0];
   if (UNAUTHENTICATED.has(url)) return;
@@ -124,6 +168,19 @@ app.addHook("preHandler", async (req, reply) => {
     req.log.warn({ err: err.message, pair_id: pair.pair_id }, "touchPairLastSeen failed");
   });
   req.pair = pair;
+
+  // Phase 1 subscription gate (opt-in, BRIDGE_REQUIRE_IAP=1). Only
+  // session-reading routes require an active receipt; /v1/whoami stays
+  // open so the app can detect "needs subscription" and surface the
+  // paywall without first holding a valid token it can't use.
+  if (REQUIRE_IAP && url.startsWith("/v1/sessions")) {
+    if (!state.isPairEntitled(pair, true)) {
+      return reply.code(402).send({
+        error: "payment_required",
+        message: "an active subscription is required; POST /v1/iap/validate with a receipt",
+      });
+    }
+  }
 });
 
 // T3 — auth-required probe. Returns the pair record derived from

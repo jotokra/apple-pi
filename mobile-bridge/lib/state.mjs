@@ -17,6 +17,7 @@ const DEFAULT_STATE = () => ({
   pairs: [],
   pending_codes: [],
   session_state: {},
+  receipts: [], // Phase 1: Apple IAP receipts (active|expired|refunded)
 });
 
 export class State {
@@ -146,6 +147,39 @@ export class State {
       if (p) p.last_seen = new Date().toISOString();
       return p ?? null;
     });
+  }
+
+  // ---- Phase 1: subscription entitlement ----
+
+  /**
+   * Is this pair entitled to read session data?
+   *
+   * Two modes:
+   *   - requireIap === false (default; BRIDGE_REQUIRE_IAP unset):
+   *     any valid bearer token is entitled. Preserves Phase 0
+   *     behaviour for local/dev use + the App-Review demo bridge.
+   *   - requireIap === true (production App-Store bridge):
+   *     the pair must be linked to a receipt whose status is active
+   *     and whose expiry is in the future. Pairing-only tokens (no
+   *     receipt link) are NOT entitled → the route returns 402.
+   *
+   * @param {object|null} pair - the pair row resolved by findPairByToken
+   * @param {boolean} requireIap
+   * @returns {boolean}
+   */
+  isPairEntitled(pair, requireIap) {
+    if (!pair) return false;
+    if (!requireIap) return true;
+    const otx = pair.receipt_original_transaction_id;
+    if (!otx) return false; // pairing-issued token, no subscription
+    const receipts = Array.isArray(this._data?.receipts) ? this._data.receipts : [];
+    const receipt = receipts.find((r) => r.original_transaction_id === otx);
+    if (!receipt) return false;
+    if (receipt.status !== "active") return false;
+    if (receipt.expires_at_ms != null && receipt.expires_at_ms <= Date.now()) {
+      return false;
+    }
+    return true;
   }
 }
 
