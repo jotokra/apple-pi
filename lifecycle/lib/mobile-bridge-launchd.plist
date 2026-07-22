@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+	lifecycle/lib/mobile-bridge-launchd.plist — LaunchAgent template for the
+	apple-pi mobile-bridge daemon. mobile.sh installs this to
+	~/Library/LaunchAgents/local.mobile-bridge.plist with the following
+	placeholders substituted at install time:
+
+	  __NODE_BIN__  — absolute path to node (resolved at install: `command -v node`)
+	  __REPO__      — absolute path to the apple-pi repo root
+	  __PI_DIR__    — apple-pi data dir ($HOME/.pi by default)
+	  __BRIDGE_PORT__ — TCP port the bridge listens on (default 7892)
+
+	KeepAlive=true + RunAtLoad=true: the bridge is a daemon; macOS will
+	respawn it if it crashes and start it on login. log paths land in
+	$PI_DIR/agent/ like the other apple-pi launchd jobs (schedule.sh uses
+	the same convention).
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key><string>local.mobile-bridge</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>__NODE_BIN__</string>
+		<string>--no-warnings</string>
+		<string>__REPO__/mobile-bridge/bin/bridge.mjs</string>
+	</array>
+	<key>WorkingDirectory</key><string>__REPO__</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key><string>__PATH__</string>
+		<key>BRIDGE_PORT</key><string>__BRIDGE_PORT__</string>
+		<key>PI_CODING_AGENT_DIR</key><string>__PI_DIR__</string>
+		<key>PI_SESSIONS_DIR</key><string>__PI_DIR__/sessions</string>
+	</dict>
+	<key>KeepAlive</key><true/>
+	<key>RunAtLoad</key><true/>
+	<key>StandardOutPath</key><string>__PI_DIR__/agent/mobile-bridge.log</string>
+	<key>StandardErrorPath</key><string>__PI_DIR__/agent/mobile-bridge.log</string>
+</dict>
+</plist>

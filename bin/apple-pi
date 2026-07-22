@@ -8,6 +8,7 @@
 //   apple-pi reject  [--latest]                  reject the latest proposal
 //   apple-pi status                            show the lifecycle state (runs/proposals/schedule)
 //   apple-pi schedule <install|status|remove|run-now>  manage the daily+weekly jobs
+//   apple-pi mobile <start|stop|status|install|uninstall|pair-device>  manage the mobile-bridge daemon (Phase 0)
 //
 // Dispatches to lifecycle/*.js. The daily collect + weekly aggregate are the
 // only scheduled jobs; review/apply/reject are interactive (the user drives them).
@@ -21,6 +22,7 @@ const { checkAll, renderText } = require("../lifecycle/update-check");
 const REPO = path.resolve(__dirname, "..");
 const LIFECYCLE = path.join(REPO, "lifecycle");
 const SCHED = path.join(REPO, "lifecycle", "schedule.sh");
+const MOBILE = path.join(REPO, "lifecycle", "mobile.sh");
 
 function nodeRun(script, args = []) {
 	const full = path.join(LIFECYCLE, script);
@@ -106,6 +108,7 @@ function help() {
   reject   [--latest]            reject the latest proposal
   status                        runs / proposals / schedule state
   schedule install|status|remove|run-now   manage the daily+weekly jobs
+  mobile start|stop|status|install|uninstall|pair-device   manage the mobile-bridge daemon (Phase 0)
   vault add|list|get|remove|prune-transient   credential vault (headless)
   update [--check]              release check: local vs GitHub releases (read-only)
   update --all --yes            apply: pi update --all + pull apple-pi + sync pivoice
@@ -137,6 +140,7 @@ function main() {
 		case "reject":     return nodeRun("apply-update.js", ["reject", ...rest]);
 		case "status":     return status();
 		case "schedule":   return spawnSync(SCHED, rest, { stdio: "inherit" }).status === 0 ? 0 : 1;
+		case "mobile":     return spawnSync(MOBILE, rest, { stdio: "inherit" }).status === 0 ? 0 : 1;
 		case "vault": {
 			// credential vault — delegates to vault/cli.js (REQ-CV-1 core/CLI shim).
 			const vaultCli = require(path.join(REPO, "vault", "cli.js"));
