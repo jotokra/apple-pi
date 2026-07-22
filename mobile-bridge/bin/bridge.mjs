@@ -24,6 +24,10 @@ import path from "node:path";
 
 import { State, defaultStatePath } from "../lib/state.mjs";
 import * as pairing from "../lib/pairing.mjs";
+import {
+  SESSIONS_DIR,
+  listSessions,
+} from "../lib/sessions.mjs";
 
 const PORT = Number(process.env.BRIDGE_PORT ?? 7892);
 const HOST = process.env.BRIDGE_HOST ?? "127.0.0.1";
@@ -127,6 +131,25 @@ app.get("/v1/whoami", async (req) => ({
   pair_id: req.pair.pair_id,
   created_at: req.pair.created_at,
   last_seen: req.pair.last_seen,
+}));
+
+// T2 — JSONL-derived session listing.
+//
+// Pure read-only computation: walks `SESSIONS_DIR()` (or the override
+// pointed at by `$PI_SESSIONS_DIR`) once per request, derives the 9
+// fields per row in lib/sessions.mjs, returns
+// `{ schema_version: 1, sessions: [...] }`.
+//
+// The route sits BEHIND T3's preHandler bearer-token hook — if the
+// caller has no valid pair, the hook already replied 401 before we
+// get here. We don't need to re-check.
+//
+// Performance: ~5ms per session for the cheap fields, ~80ms for
+// listings > 100 (SUPERPROMPT §6 cost note). Phase 0 hit-list is
+// well under that.
+app.get("/v1/sessions", async () => ({
+  schema_version: 1,
+  sessions: await listSessions(),
 }));
 
 // Surface the package root so downstream tasks can derive
